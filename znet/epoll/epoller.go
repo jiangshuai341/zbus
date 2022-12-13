@@ -60,8 +60,9 @@ func (que *TaskQueue) IsEmpty() bool {
 	return que.q.IsEmpty()
 }
 
+var taskPool = sync.Pool{New: func() any { return new(Task) }}
+
 type asyncTack struct {
-	taskPool  sync.Pool
 	isWeak    int32
 	triggerFD int            //trigger handle task queue
 	normal    AsyncTaskQueue // queue with low priority
@@ -70,18 +71,13 @@ type asyncTack struct {
 
 // getTask gets a cached Task from pool.
 func (a *asyncTack) getTask() *Task {
-	return a.taskPool.Get().(*Task)
+	return taskPool.Get().(*Task)
 }
 
 // putTask puts the trashy Task back in pool.
 func (a *asyncTack) putTask(task *Task) {
 	task.Run, task.Arg = nil, nil
-	a.taskPool.Put(task)
-}
-
-type EpollerEvent struct {
-	FD       int
-	Callback func( /*fd*/ int /*event*/, uint32) error
+	taskPool.Put(task)
 }
 
 func OpenEpoller() (poller *Epoller, err error) {
@@ -93,7 +89,11 @@ func OpenEpoller() (poller *Epoller, err error) {
 		return
 	}
 	r, _, e := syscall.Syscall(syscall.SYS_EVENTFD2, uintptr(0), uintptr(syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC), 0)
-	poller.triggerFD, err = int(r), e
+	if e != 0 {
+		err = e
+	}
+	poller.triggerFD = int(r)
+
 	if err != nil {
 		_ = poller.Close()
 		poller = nil
@@ -106,9 +106,8 @@ func OpenEpoller() (poller *Epoller, err error) {
 		poller = nil
 		return
 	}
-	poller.taskPool = sync.Pool{New: func() any { return new(Task) }}
-	poller.normal = NewTaskQueue()
-	poller.urgent = NewTaskQueue()
+	poller.asyncTack.normal = NewTaskQueue()
+	poller.asyncTack.urgent = NewTaskQueue()
 	return
 }
 
@@ -164,7 +163,7 @@ func (p *Epoller) AppendTask(fn TaskFunc, arg ...any) (err error) {
 //}
 
 func (p *Epoller) Epolling(callback func(fd int, ev uint32)) (err error) {
-	var activeEvents = make([]syscall.EpollEvent, 10240)
+	var maxEvents = make([]syscall.EpollEvent, 1024)
 	var eventNums int
 
 	var fdHandling int32
@@ -175,15 +174,17 @@ func (p *Epoller) Epolling(callback func(fd int, ev uint32)) (err error) {
 
 	var currentTask *Task
 	for {
-		switch eventNums, err = syscall.EpollWait(p.triggerFD, activeEvents, -1); err {
-		case nil, syscall.EAGAIN, syscall.EINTR:
+		switch eventNums, err = syscall.EpollWait(p.fd, maxEvents, -1); err {
+		case nil:
+		case syscall.EAGAIN, syscall.EINTR:
+			continue
 		default:
 			return
 		}
 
 		for i := 0; i < eventNums; i++ {
-			fdHandling = activeEvents[i].Fd
-			eventHandling = activeEvents[i].Events
+			fdHandling = maxEvents[i].Fd
+			eventHandling = maxEvents[i].Events
 
 			if fdHandling == int32(p.triggerFD) {
 				_, _ = syscall.Read(p.triggerFD, triggerReadBuf)

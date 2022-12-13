@@ -1,6 +1,8 @@
 package socket
 
 import (
+	"github.com/jiangshuai341/zbus/toolkit"
+	"github.com/jiangshuai341/zbus/zpool"
 	"net"
 	"syscall"
 )
@@ -61,4 +63,43 @@ func ipToSockAddrInet6(ip net.IP, port int, zone string) (syscall.SockaddrInet6,
 	}
 	sa.ZoneId = uint32(iface.Index)
 	return sa, nil
+}
+
+var ipv4InIPv6Prefix = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff}
+
+func sockaddrInet4ToIP(sa *syscall.SockaddrInet4) net.IP {
+	ip := zpool.Get2(16)
+	// ipv4InIPv6Prefix
+	copy(ip[0:12], ipv4InIPv6Prefix)
+	copy(ip[12:16], sa.Addr[:])
+	return ip
+}
+
+func sockaddrInet6ToIPAndZone(sa *syscall.SockaddrInet6) (net.IP, string) {
+	ip := zpool.Get2(16)
+	copy(ip, sa.Addr[:])
+	return ip, ip6ZoneToString(int(sa.ZoneId))
+}
+
+func ip6ZoneToString(zone int) string {
+	if zone == 0 {
+		return ""
+	}
+	if ifi, err := net.InterfaceByIndex(zone); err == nil {
+		return ifi.Name
+	}
+	return int2decimal(uint(zone))
+}
+
+func int2decimal(i uint) string {
+	if i == 0 {
+		return "0"
+	}
+	b := zpool.Get2(32)
+	bp := len(b)
+	for ; i > 0; i /= 10 {
+		bp--
+		b[bp] = byte(i%10) + '0'
+	}
+	return toolkit.BytesToString(b[bp:])
 }

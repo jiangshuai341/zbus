@@ -13,7 +13,7 @@ func tcpSocket(protoType ProtoType, addr string, listen bool, sockOpts ...Option
 		ipv6only bool
 		sa       syscall.Sockaddr
 	)
-	if sa, family, netAddr, ipv6only, err = GetTCPSockAddr(protoType, addr); err != nil {
+	if sa, family, netAddr, ipv6only, err = getTCPSockAddr(protoType, addr); err != nil {
 		return
 	}
 	if fd, err = createSockFD(family, syscall.SOCK_STREAM, syscall.IPPROTO_TCP); err != nil {
@@ -49,7 +49,7 @@ func tcpSocket(protoType ProtoType, addr string, listen bool, sockOpts ...Option
 	return
 }
 
-func GetTCPSockAddr(protoType ProtoType, addr string) (sa syscall.Sockaddr, family int, tcpAddr *net.TCPAddr, ipv6only bool, err error) {
+func getTCPSockAddr(protoType ProtoType, addr string) (sa syscall.Sockaddr, family int, tcpAddr *net.TCPAddr, ipv6only bool, err error) {
 	tcpAddr, err = net.ResolveTCPAddr(string(protoType), addr)
 	if err != nil {
 		return

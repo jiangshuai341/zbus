@@ -25,12 +25,17 @@ type Option struct {
 	Opt        int
 }
 
+//TCPSocket 默认就是非阻塞Socket
 func TCPSocket(protoType ProtoType, addr string, listen bool, sockOpts ...Option) (int, net.Addr, error) {
 	return tcpSocket(protoType, addr, listen, sockOpts...)
 }
+
+//UDPSocket 默认就是非阻塞Socket
 func UDPSocket(protoType ProtoType, addr string, sockOpts ...Option) (int, net.Addr, error) {
 	return udpSocket(protoType, addr, sockOpts...)
 }
+
+//UDSSocket 默认就是非阻塞Socket
 func UDSSocket(addr string, passive bool, sockOpts ...Option) (int, net.Addr, error) {
 	return udsSocket(addr, passive, sockOpts...)
 }
@@ -91,7 +96,7 @@ func SetTcpKeepAlive(fd, _ int) error {
 
 // SetRecvBuffer 设置Socket接收缓冲区大小
 func SetRecvBuffer(fd, size int) error {
-	
+
 	return syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, size)
 }
 
@@ -100,7 +105,28 @@ func SetSendBuffer(fd, size int) error {
 	return syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_SNDBUF, size)
 }
 
-// createSockFD 默认 非阻塞 子进程不继承
-func createSockFD(family, sotype, proto int) (int, error) {
-	return syscall.Socket(family, sotype|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, proto)
+func SockaddrToTCPOrUnixAddr(sa syscall.Sockaddr) net.Addr {
+	switch sa := sa.(type) {
+	case *syscall.SockaddrInet4:
+		ip := sockaddrInet4ToIP(sa)
+		return &net.TCPAddr{IP: ip, Port: sa.Port}
+	case *syscall.SockaddrInet6:
+		ip, zone := sockaddrInet6ToIPAndZone(sa)
+		return &net.TCPAddr{IP: ip, Port: sa.Port, Zone: zone}
+	case *syscall.SockaddrUnix:
+		return &net.UnixAddr{Name: sa.Name, Net: "unix"}
+	}
+	return nil
+}
+
+func SockaddrToUDPAddr(sa syscall.Sockaddr) net.Addr {
+	switch sa := sa.(type) {
+	case *syscall.SockaddrInet4:
+		ip := sockaddrInet4ToIP(sa)
+		return &net.UDPAddr{IP: ip, Port: sa.Port}
+	case *syscall.SockaddrInet6:
+		ip, zone := sockaddrInet6ToIPAndZone(sa)
+		return &net.UDPAddr{IP: ip, Port: sa.Port, Zone: zone}
+	}
+	return nil
 }

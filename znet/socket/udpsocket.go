@@ -13,7 +13,7 @@ func udpSocket(protoType ProtoType, addr string, sockOpts ...Option) (fd int, ne
 		ipv6only bool
 		sa       syscall.Sockaddr
 	)
-	if sa, family, netAddr, ipv6only, err = GetUDPSockAddr(protoType, addr); err != nil {
+	if sa, family, netAddr, ipv6only, err = getUDPSockAddr(protoType, addr); err != nil {
 		return
 	}
 	if fd, err = createSockFD(family, syscall.SOCK_DGRAM, syscall.IPPROTO_UDP); err != nil {
@@ -52,7 +52,7 @@ func udpSocket(protoType ProtoType, addr string, sockOpts ...Option) (fd int, ne
 	return
 }
 
-func GetUDPSockAddr(protoType ProtoType, addr string) (sa syscall.Sockaddr, family int, udpAddr *net.UDPAddr, ipv6only bool, err error) {
+func getUDPSockAddr(protoType ProtoType, addr string) (sa syscall.Sockaddr, family int, udpAddr *net.UDPAddr, ipv6only bool, err error) {
 	udpAddr, err = net.ResolveUDPAddr(string(protoType), addr)
 	if err != nil {
 		return

@@ -22,8 +22,20 @@ type LinkListBuffer struct {
 	tail  *node
 	size  int
 	bytes int
+}
 
-	peekTemp [][]byte //优化 peek 避免频繁申请
+func NewLinkListBuffer() *LinkListBuffer {
+	return &LinkListBuffer{
+		head:  nil,
+		tail:  nil,
+		size:  0,
+		bytes: 0,
+	}
+}
+
+// NewBytesFromPool 必不为空
+func (llb *LinkListBuffer) NewBytesFromPool(len int) []byte {
+	return zpool.Get2(len)
 }
 
 // ListLength 链表长度

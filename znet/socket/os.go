@@ -48,3 +48,8 @@ func Dup(fd int) (int, string, error) {
 	syscall.CloseOnExec(newFD)
 	return newFD, "", nil
 }
+
+// createSockFD 默认 非阻塞 子进程不继承
+func createSockFD(family, sotype, proto int) (int, error) {
+	return syscall.Socket(family, sotype|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, proto)
+}

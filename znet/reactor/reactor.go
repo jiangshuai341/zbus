@@ -1,4 +1,4 @@
-﻿package reactor
+package reactor
 
 import (
 	"errors"
@@ -14,13 +14,18 @@ var ErrNetHandle = errors.New("please init INetHandle conn before add")
 
 type Reactor struct {
 	epoller         *epoll.Epoller
-	conns           map[int]*connection
-	tempReadBuffer  zbuf.ArrayBuffer
+	conns           map[int]*Connection
+	tempReadBuffer  zbuf.ArrayBuffers
 	tempWriteBuffer [][]byte
 }
 
 func NewReactor() (r *Reactor, err error) {
-	r = &Reactor{conns: make(map[int]*connection)}
+	r = &Reactor{
+		conns:           make(map[int]*Connection),
+		epoller:         nil,
+		tempReadBuffer:  zbuf.ArrayBuffers{},
+		tempWriteBuffer: make([][]byte, 0),
+	}
 	r.tempReadBuffer.Reserve(socket.SocketReadBufferSize)
 	r.epoller, err = epoll.OpenEpoller()
 	if err != nil {
@@ -59,10 +64,11 @@ func (r *Reactor) OnReadWriteEventTrigger(fd int, ev uint32) {
 }
 
 //AddConn
-func (r *Reactor) AddConn(conn *connection) error {
+func (r *Reactor) AddConn(conn *Connection) error {
 	if conn.INetHandle == nil {
 		return ErrNetHandle
 	}
+	conn.reactor = r
 	r.conns[conn.fd] = conn
 	return r.epoller.AddReadWrite(conn.fd)
 }

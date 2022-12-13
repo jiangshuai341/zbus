@@ -14,7 +14,7 @@ func udsSocket(addr string, listen bool, sockOpts ...Option) (fd int, netAddr ne
 		family int
 		sa     syscall.Sockaddr
 	)
-	if sa, family, netAddr, err = GetUnixSocket(addr); err != nil {
+	if sa, family, netAddr, err = getUnixSocket(addr); err != nil {
 		err = os.NewSyscallError("socket", err)
 		return
 	}
@@ -22,7 +22,7 @@ func udsSocket(addr string, listen bool, sockOpts ...Option) (fd int, netAddr ne
 		err = os.NewSyscallError("socket", err)
 		return
 	}
-	
+
 	defer func() {
 		if err != nil {
 			if err, ok := err.(*os.SyscallError); ok && err.Err == syscall.EINPROGRESS {
@@ -49,7 +49,7 @@ func udsSocket(addr string, listen bool, sockOpts ...Option) (fd int, netAddr ne
 	return
 }
 
-func GetUnixSocket(addr string) (sa syscall.Sockaddr, family int, unixAddr *net.UnixAddr, err error) {
+func getUnixSocket(addr string) (sa syscall.Sockaddr, family int, unixAddr *net.UnixAddr, err error) {
 	unixAddr, err = net.ResolveUnixAddr(string(UDS), addr)
 	if err != nil {
 		return

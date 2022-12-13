@@ -1,9 +1,12 @@
-﻿package reactor
+package reactor
 
 import (
+	"errors"
 	"github.com/jiangshuai341/zbus/zbuf"
 	"github.com/jiangshuai341/zbus/znet/epoll"
+	"github.com/jiangshuai341/zbus/znet/socket"
 	"net"
+	"os"
 	"syscall"
 )
 
@@ -12,47 +15,76 @@ type INetHandle interface {
 	OnClose()
 }
 
-const MaxBufferLength int32 = 10240 //bytes
-
-type connection struct {
+type Connection struct {
+	fd             int                  // file descriptor
 	localAddr      net.Addr             // local addr
 	remoteAddr     net.Addr             // remote addr
 	outboundBuffer *zbuf.LinkListBuffer // 出栈缓冲区
 	inboundBuffer  *zbuf.LinkListBuffer // 入栈缓冲区
-	buffer         []byte               // buffer for the latest bytes
-	fd             int                  // file descriptor
 	reactor        *Reactor
 	tempPeek       [][]byte
-	isActiveWrite  bool
 	INetHandle
 }
 
-func (c *connection) SendSafe() {
+var errNetHandleImpIsNil = errors.New("[newTCPConn] NetHandleImp Is Nil")
 
+func newTCPConn(fd int) (*Connection, error) {
+	if err := os.NewSyscallError("fcntl nonblock", syscall.SetNonblock(fd, true)); err != nil {
+		return nil, err
+	}
+	lsa, err := syscall.Getsockname(fd)
+	if err != nil {
+		return nil, err
+	}
+	rsa, err := syscall.Getpeername(fd)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Connection{
+		fd:             fd,
+		localAddr:      socket.SockaddrToTCPOrUnixAddr(lsa),
+		remoteAddr:     socket.SockaddrToTCPOrUnixAddr(rsa),
+		outboundBuffer: zbuf.NewLinkListBuffer(),
+		inboundBuffer:  zbuf.NewLinkListBuffer(),
+		tempPeek:       make([][]byte, 0, 8),
+	}, nil
 }
 
-//SendSafeNoCopy 在IO线程中调用
-func (c *connection) SendSafeNoCopy(data []byte) error {
+func (c *Connection) SendSafe(data []byte) error {
 	return c.reactor.epoller.AppendTask(func(arg ...any) {
-
+		for _, v := range arg {
+			c.SendUnsafe(v.([]byte))
+		}
 	}, data)
 }
 
-//SendUnsafe 必须在IO线程中调用
-func (c *connection) SendUnsafe(data []byte) error {
-	return nil
+//SendSafeNoCopy 线程安全
+func (c *Connection) SendSafeNoCopy(data []byte) error {
+	return c.reactor.epoller.AppendTask(func(arg ...any) {
+		for _, v := range arg {
+			c.SendUnsafeNoCopy(v.([]byte))
+		}
+	}, data)
 }
 
-func (c *connection) SendUnsafeNoCopy(data []byte) error {
-	return nil
+//SendUnsafe 非线程安全
+func (c *Connection) SendUnsafe(data []byte) {
+	temp := c.outboundBuffer.NewBytesFromPool(len(data))
+	copy(temp, data)
+	c.write(temp)
 }
-func (c *connection) onRemoteClose() {
+
+func (c *Connection) SendUnsafeNoCopy(data []byte) {
+	c.write(data)
+}
+func (c *Connection) onRemoteClose() {
 	delete(c.reactor.conns, c.fd)
 	_ = c.reactor.epoller.Delete(c.fd)
 	c.INetHandle.OnClose()
 }
 
-func (c *connection) write(data []byte) {
+func (c *Connection) write(data []byte) {
 	if c.outboundBuffer.IsEmpty() {
 		c.outboundBuffer.PushNoCopy(&data)
 		//writeSocketDirectly 利用EPOLLET的虹吸效应 激活EPOLL ET
@@ -62,7 +94,7 @@ func (c *connection) write(data []byte) {
 	}
 }
 
-func (c *connection) onTraffic() {
+func (c *Connection) onTraffic() {
 	for {
 		n, err := epoll.Readv(c.fd, *c.reactor.tempReadBuffer.Buffer())
 		//syscall.EWOULDBLOCK == syscall.EAGAIN
@@ -72,7 +104,7 @@ func (c *connection) onTraffic() {
 		}
 		if n < 0 || err != nil {
 			c.onRemoteClose()
-			log.Errorf("[onTraffic] [connection will close] syscall Readv return:%d err:%+v ", n, err)
+			log.Errorf("[onTraffic] [Connection will close] syscall Readv return:%d err:%+v ", n, err)
 			return
 		}
 		c.inboundBuffer.PushsNoCopy(c.reactor.tempReadBuffer.MoveTemp(n))
@@ -81,7 +113,7 @@ func (c *connection) onTraffic() {
 	c.INetHandle.OnTraffic(&c.tempPeek)
 }
 
-func (c *connection) onTriggerWrite() {
+func (c *Connection) onTriggerWrite() {
 	for {
 		c.outboundBuffer.Peek(-1, &c.reactor.tempWriteBuffer)
 		n, err := epoll.Writev(c.fd, c.reactor.tempWriteBuffer)
@@ -91,7 +123,7 @@ func (c *connection) onTriggerWrite() {
 		}
 		if n < 0 || err != nil {
 			c.onRemoteClose()
-			log.Errorf("[onTriggerWrite] [connection will close] syscall Writev return:%d err:%+v ", n, err)
+			log.Errorf("[onTriggerWrite] [Connection will close] syscall Writev return:%d err:%+v ", n, err)
 			return
 		}
 		c.outboundBuffer.DiscardBytes(n)

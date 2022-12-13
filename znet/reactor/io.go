@@ -1,5 +1,0 @@
-﻿package reactor
-
-func ActiveIO() {
-	
-}
