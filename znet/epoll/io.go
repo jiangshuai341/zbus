@@ -19,6 +19,9 @@ func Readv(fd int, buffers [][]byte) (int, error) {
 	}
 	_p0 := unsafe.Pointer(&iovecs[0])
 	n, _, err := syscall.Syscall(syscall.SYS_READV, uintptr(fd), uintptr(_p0), uintptr(len(iovecs)))
+	if err == 0 {
+		return int(n), nil
+	}
 	return int(n), err
 }
 func Writev(fd int, buffers [][]byte) (int, error) {
@@ -29,6 +32,9 @@ func Writev(fd int, buffers [][]byte) (int, error) {
 	}
 	ptr = unsafe.Pointer(&iovecs[0])
 	n, _, err := syscall.Syscall(syscall.SYS_WRITEV, uintptr(fd), uintptr(ptr), uintptr(len(iovecs)))
+	if err == 0 {
+		return int(n), nil
+	}
 	return int(n), err
 }
 

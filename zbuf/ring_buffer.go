@@ -88,6 +88,19 @@ func (rb *RingBuffer) Discard(n int) int {
 	return LengthData
 }
 
+// DataSpaceGrow 标记写入了更多数据
+func (rb *RingBuffer) DataSpaceGrow(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	LengthFree := rb.LengthFree()
+	if n > LengthFree {
+		n = LengthFree
+	}
+	rb.w = (rb.w + n) % rb.size
+	return n
+}
+
 func (rb *RingBuffer) WriteToSlice(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil

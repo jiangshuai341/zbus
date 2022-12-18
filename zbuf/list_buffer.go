@@ -4,7 +4,8 @@ import (
 	"errors"
 	"github.com/jiangshuai341/zbus/zpool"
 	"io"
-	"math"
+	"reflect"
+	"unsafe"
 )
 
 type node struct {
@@ -48,7 +49,7 @@ func (llb *LinkListBuffer) ByteLength() int {
 	return llb.bytes
 }
 
-//IsEmpty 是否为空
+// IsEmpty 是否为空
 func (llb *LinkListBuffer) IsEmpty() bool {
 	return llb.head == nil
 }
@@ -76,19 +77,72 @@ func (llb *LinkListBuffer) Emplace(num int, ret *[][]byte) {
 		num -= len(temp)
 	}
 }
-
-func (llb *LinkListBuffer) Peek(maxBytes int, ret *[][]byte) {
-	if maxBytes <= 0 {
-		maxBytes = math.MaxInt32
+func min(a int, b int) int {
+	if a < b {
+		return a
 	}
-
-	var cum int
+	return b
+}
+func discardHead(buf *[]byte, num int) {
+	if buf == nil || len(*buf) <= num {
+		return
+	}
+	copy(*buf, (*buf)[num:])
+	sh := (*reflect.SliceHeader)(unsafe.Pointer(buf))
+	sh.Len = sh.Len - num
+}
+func (llb *LinkListBuffer) Peek(needNum int, ret *[][]byte) {
+	if needNum <= 0 {
+		needNum = llb.bytes
+	}
 	for iter := llb.head; iter != nil; iter = iter.next {
-		*ret = append(*ret, iter.buf)
-		if cum += iter.len(); cum >= maxBytes {
+		*ret = append(*ret, iter.buf[:min(iter.len(), needNum)])
+		if needNum -= iter.len(); needNum <= 0 {
 			break
 		}
 	}
+}
+
+//func (llb *LinkListBuffer) PeekAndDiscard(needNum int) []byte {
+//	if needNum <= 0 {
+//		needNum = llb.bytes
+//	}
+//	var ret []byte
+//	for iter := llb.head; iter != nil; iter = iter.next {
+//		ret = append(ret, iter.buf[0:min(needNum, len(iter.buf))]...)
+//		llb.DiscardBytes(min(needNum, len(iter.buf)))
+//		if needNum -= iter.len(); needNum <= 0 {
+//			break
+//		}
+//	}
+//	return ret
+//}
+
+func (llb *LinkListBuffer) PeekInt64() int64 {
+	if llb.bytes < 8 {
+		return 0
+	}
+	return *(*int64)(unsafe.Pointer(&(llb.head.buf[0])))
+}
+
+func (llb *LinkListBuffer) PeekInt32() int32 {
+	if llb.bytes < 4 {
+		return 0
+	}
+	return *(*int32)(unsafe.Pointer(&(llb.head.buf[0])))
+}
+
+func (llb *LinkListBuffer) PeekInt16() int16 {
+	if llb.bytes < 2 {
+		return 0
+	}
+	return *(*int16)(unsafe.Pointer(&(llb.head.buf[0])))
+}
+func (llb *LinkListBuffer) PeekInt8() int8 {
+	if llb.bytes < 1 {
+		return 0
+	}
+	return *(*int8)(unsafe.Pointer(&(llb.head.buf[0])))
 }
 
 // DiscardBytes removes some nodes based on n bytes.
@@ -102,7 +156,7 @@ func (llb *LinkListBuffer) DiscardBytes(n int) (discarded int) {
 			break
 		}
 		if n < b.len() {
-			b.buf = b.buf[n:]
+			discardHead(&b.buf, n)
 			discarded += n
 			llb.pushFront(b)
 			break
@@ -174,7 +228,7 @@ func (llb *LinkListBuffer) WriteTo(w io.Writer) (n int64, err error) {
 			return
 		}
 		if m < b.len() {
-			b.buf = b.buf[m:]
+			discardHead(&b.buf, m)
 			llb.pushFront(b)
 			return n, io.ErrShortWrite
 		}

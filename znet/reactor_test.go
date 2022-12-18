@@ -1,19 +1,26 @@
 package znet
 
 import (
+	"github.com/jiangshuai341/zbus/logger"
 	"github.com/jiangshuai341/zbus/toolkit"
 	"github.com/jiangshuai341/zbus/znet/reactor"
 	"net"
+	"reflect"
+	"sync"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 type TcpTask struct {
+	c *reactor.Connection
 }
 
-func (t *TcpTask) OnTraffic(data *[][]byte) bool {
+var testLog = logger.GetLogger("ReactorTest")
 
-	return true
+func (t *TcpTask) OnTraffic(data *[][]byte) (discardNum int) {
+	t.c.SendUnsafeNoCopy((*data)[0])
+	return 8
 }
 func (t *TcpTask) OnClose() {
 
@@ -35,8 +42,9 @@ func NewReactorMgr() (e *ReactorMgr) {
 	}
 	return
 }
+
 func OnAccept(conn *reactor.Connection) {
-	conn.INetHandle = &TcpTask{}
+	conn.INetHandle = &TcpTask{c: conn}
 	err := reactorMgr.LoadBalance().AddConn(conn)
 	if err != nil {
 		return
@@ -57,11 +65,31 @@ func TestListen(t *testing.T) {
 
 func TestClient(t *testing.T) {
 	conn, _ := net.Dial("tcp", "0.0.0.0:9999")
-	var str string = "hhhhhhhh"
-	_, err := conn.Write(toolkit.StringToBytes(str))
-	if err != nil {
-		t.Log(err)
-	}
+	var num = 1
+	var syncCtx sync.WaitGroup
+	syncCtx.Add(1)
+	go func() {
+		var tempRead []byte = make([]byte, 1024)
+
+		var tempWrite []byte
+		a := (*reflect.SliceHeader)(unsafe.Pointer(&tempWrite))
+		a.Len = 8
+		a.Data = uintptr(unsafe.Pointer(&num))
+		a.Cap = 8
+
+		var readNum *int64 = (*int64)(unsafe.Pointer(&tempRead[0]))
+
+		for {
+			n, err := conn.Write(tempWrite)
+			testLog.Infof("num:%d ret:%d err:%+v", n, num, err)
+			n, err = conn.Read(tempRead)
+			testLog.Infof("num:%d ret:%d err:%+v", n, *readNum, err)
+			num++
+		}
+		syncCtx.Done()
+	}()
+
+	syncCtx.Wait()
 }
 
 func BenchmarkSend(b *testing.B) {

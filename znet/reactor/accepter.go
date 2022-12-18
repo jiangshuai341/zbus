@@ -60,7 +60,7 @@ func ActiveListener(addr string, number int, OnAccept func(conn *Connection)) (r
 	return ret, err
 }
 
-//AddListen 线程安全
+// AddListen 线程安全
 func (a *Accepter) AddListen(fd int) error {
 	return a.ep.AddRead(fd)
 }
@@ -78,7 +78,7 @@ if (conn_sock == -1)
 }
 */
 
-//onAccept 执行线程 IO Thread
+// onAccept 执行线程 IO Thread
 func (a *Accepter) onAccept(lfd int, _ uint32) {
 	var fd int
 	var err error

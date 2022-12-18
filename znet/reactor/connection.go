@@ -1,7 +1,6 @@
 package reactor
 
 import (
-	"errors"
 	"github.com/jiangshuai341/zbus/zbuf"
 	"github.com/jiangshuai341/zbus/znet/epoll"
 	"github.com/jiangshuai341/zbus/znet/socket"
@@ -11,7 +10,7 @@ import (
 )
 
 type INetHandle interface {
-	OnTraffic(data *[][]byte) bool
+	OnTraffic(data *[][]byte) (discardNum int)
 	OnClose()
 }
 
@@ -20,13 +19,11 @@ type Connection struct {
 	localAddr      net.Addr             // local addr
 	remoteAddr     net.Addr             // remote addr
 	outboundBuffer *zbuf.LinkListBuffer // 出栈缓冲区
-	inboundBuffer  *zbuf.LinkListBuffer // 入栈缓冲区
+	inboundBuffer  *zbuf.CombinesBuffer // 入栈缓冲区
 	reactor        *Reactor
 	tempPeek       [][]byte
 	INetHandle
 }
-
-var errNetHandleImpIsNil = errors.New("[newTCPConn] NetHandleImp Is Nil")
 
 func newTCPConn(fd int) (*Connection, error) {
 	if err := os.NewSyscallError("fcntl nonblock", syscall.SetNonblock(fd, true)); err != nil {
@@ -46,7 +43,7 @@ func newTCPConn(fd int) (*Connection, error) {
 		localAddr:      socket.SockaddrToTCPOrUnixAddr(lsa),
 		remoteAddr:     socket.SockaddrToTCPOrUnixAddr(rsa),
 		outboundBuffer: zbuf.NewLinkListBuffer(),
-		inboundBuffer:  zbuf.NewLinkListBuffer(),
+		inboundBuffer:  zbuf.NewCombinesBuffer(1024 * 2),
 		tempPeek:       make([][]byte, 0, 8),
 	}, nil
 }
@@ -59,7 +56,7 @@ func (c *Connection) SendSafe(data []byte) error {
 	}, data)
 }
 
-//SendSafeNoCopy 线程安全
+// SendSafeNoCopy 线程安全
 func (c *Connection) SendSafeNoCopy(data []byte) error {
 	return c.reactor.epoller.AppendTask(func(arg ...any) {
 		for _, v := range arg {
@@ -68,7 +65,7 @@ func (c *Connection) SendSafeNoCopy(data []byte) error {
 	}, data)
 }
 
-//SendUnsafe 非线程安全
+// SendUnsafe 非线程安全
 func (c *Connection) SendUnsafe(data []byte) {
 	temp := c.outboundBuffer.NewBytesFromPool(len(data))
 	copy(temp, data)
@@ -96,13 +93,10 @@ func (c *Connection) write(data []byte) {
 
 func (c *Connection) onTraffic() {
 	for {
-		//temp := make([]byte, 1000)
-		//n, err := syscall.Read(c.fd, temp)
-		n, err := epoll.Readv(c.fd, *c.reactor.tempReadBuffer.Buffer())
-
-		//syscall.EWOULDBLOCK == syscall.EAGAIN
+		prefix := c.reactor.tempReadBuffer.GetPrefix()
+		prefix[0], prefix[1] = c.inboundBuffer.PeekFreeSpace()
+		n, err := epoll.Readv(c.fd, *c.reactor.tempReadBuffer.BufferWithPrefix())
 		if err == syscall.EAGAIN || err == syscall.EINTR || n == 0 {
-			c.inboundBuffer.PushsNoCopy(c.reactor.tempReadBuffer.MoveTemp(n))
 			break
 		}
 		if n < 0 || err != nil {
@@ -110,11 +104,12 @@ func (c *Connection) onTraffic() {
 			log.Errorf("[onTraffic] [Connection will close] syscall Readv return:%d err:%+v ", n, err)
 			return
 		}
+		n -= c.inboundBuffer.UpdateDataSpaceNum(n)
 		c.inboundBuffer.PushsNoCopy(c.reactor.tempReadBuffer.MoveTemp(n))
 	}
 	c.tempPeek = c.tempPeek[:0]
-	c.inboundBuffer.Peek(-1, &c.tempPeek)
-	c.INetHandle.OnTraffic(&c.tempPeek)
+	c.inboundBuffer.PeekDataSpace(&c.tempPeek)
+	c.inboundBuffer.Discard(c.INetHandle.OnTraffic(&c.tempPeek))
 }
 
 func (c *Connection) onTriggerWrite() {
@@ -122,6 +117,7 @@ func (c *Connection) onTriggerWrite() {
 		return
 	}
 	for {
+		c.reactor.tempWriteBuffer = c.reactor.tempWriteBuffer[:0]
 		c.outboundBuffer.Peek(-1, &c.reactor.tempWriteBuffer)
 		n, err := epoll.Writev(c.fd, c.reactor.tempWriteBuffer)
 		if err == syscall.EAGAIN || err == syscall.EINTR || n == 0 {
