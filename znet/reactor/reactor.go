@@ -5,7 +5,6 @@ import (
 	"github.com/jiangshuai341/zbus/logger"
 	"github.com/jiangshuai341/zbus/zbuf"
 	"github.com/jiangshuai341/zbus/znet/epoll"
-	"github.com/jiangshuai341/zbus/znet/socket"
 	"syscall"
 )
 
@@ -26,7 +25,8 @@ func NewReactor() (r *Reactor, err error) {
 		tempReadBuffer:  zbuf.ArrayBuffers{},
 		tempWriteBuffer: make([][]byte, 0),
 	}
-	r.tempReadBuffer.Reserve(socket.SocketReadBufferSize)
+	//r.tempReadBuffer.Reserve(socket.SocketReadBufferSize)
+	r.tempReadBuffer.Reserve(1024 * 10 * 5)
 	r.epoller, err = epoll.OpenEpoller()
 	if err != nil {
 		return nil, err
@@ -43,6 +43,9 @@ func NewReactor() (r *Reactor, err error) {
 //DoTaskInIoThread
 func (r *Reactor) DoTaskInIoThread(fn epoll.TaskFunc, arg ...any) error {
 	return r.epoller.AppendTask(fn, arg)
+}
+func (r *Reactor) DoUrgentTaskInIoThread(fn epoll.TaskFunc, arg ...any) error {
+	return r.epoller.AppendUrgentTask(fn, arg)
 }
 
 //OnReadWriteEventTrigger Trigger On Io Thread
@@ -63,12 +66,15 @@ func (r *Reactor) OnReadWriteEventTrigger(fd int, ev uint32) {
 	}
 }
 
-//AddConn
+//AddConn 添加链接到reactor 此过程为异步
 func (r *Reactor) AddConn(conn *Connection) error {
 	if conn.INetHandle == nil {
 		return ErrNetHandle
 	}
-	conn.reactor = r
-	r.conns[conn.fd] = conn
-	return r.epoller.AddReadWrite(conn.fd)
+
+	return r.DoUrgentTaskInIoThread(func(a ...any) {
+		conn.reactor = r
+		r.conns[conn.fd] = conn
+		_ = r.epoller.AddReadWrite(conn.fd)
+	})
 }

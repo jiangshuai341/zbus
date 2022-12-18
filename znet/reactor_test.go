@@ -1,6 +1,7 @@
 package znet
 
 import (
+	"github.com/jiangshuai341/zbus/toolkit"
 	"github.com/jiangshuai341/zbus/znet/reactor"
 	"net"
 	"testing"
@@ -55,20 +56,32 @@ func TestListen(t *testing.T) {
 }
 
 func TestClient(t *testing.T) {
-	net.Dial("tcp", "0.0.0.0:9999")
-	time.Sleep(1000000 * time.Second)
+	conn, _ := net.Dial("tcp", "0.0.0.0:9999")
+	var str string = "hhhhhhhh"
+	_, err := conn.Write(toolkit.StringToBytes(str))
+	if err != nil {
+		t.Log(err)
+	}
 }
 
 func BenchmarkSend(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-
+	conn, err := net.Dial("tcp", "0.0.0.0:9999")
+	if err != nil {
+		b.Log(err)
 	}
-	b.Log()
+	var str string = "hhhhhhhh"
+	for i := 0; i < b.N; i++ {
+		_, err = conn.Write(toolkit.StringToBytes(str))
+		if err != nil {
+			b.Log(err)
+		}
+	}
 }
 
 func BenchmarkRecv(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 
 	}
+
 	b.Log()
 }

@@ -96,9 +96,12 @@ func (c *Connection) write(data []byte) {
 
 func (c *Connection) onTraffic() {
 	for {
+		//temp := make([]byte, 1000)
+		//n, err := syscall.Read(c.fd, temp)
 		n, err := epoll.Readv(c.fd, *c.reactor.tempReadBuffer.Buffer())
+
 		//syscall.EWOULDBLOCK == syscall.EAGAIN
-		if err == syscall.EAGAIN || err == syscall.EINTR {
+		if err == syscall.EAGAIN || err == syscall.EINTR || n == 0 {
 			c.inboundBuffer.PushsNoCopy(c.reactor.tempReadBuffer.MoveTemp(n))
 			break
 		}
@@ -109,15 +112,19 @@ func (c *Connection) onTraffic() {
 		}
 		c.inboundBuffer.PushsNoCopy(c.reactor.tempReadBuffer.MoveTemp(n))
 	}
+	c.tempPeek = c.tempPeek[:0]
 	c.inboundBuffer.Peek(-1, &c.tempPeek)
 	c.INetHandle.OnTraffic(&c.tempPeek)
 }
 
 func (c *Connection) onTriggerWrite() {
+	if c.outboundBuffer.ByteLength() == 0 {
+		return
+	}
 	for {
 		c.outboundBuffer.Peek(-1, &c.reactor.tempWriteBuffer)
 		n, err := epoll.Writev(c.fd, c.reactor.tempWriteBuffer)
-		if err == syscall.EAGAIN || err == syscall.EINTR {
+		if err == syscall.EAGAIN || err == syscall.EINTR || n == 0 {
 			c.outboundBuffer.DiscardBytes(n)
 			break
 		}

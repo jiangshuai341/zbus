@@ -36,15 +36,15 @@ func (a *ArrayBuffers) MoveTemp(num int) *[][]byte {
 	if num > a.size {
 		panic("moveTempHead arg error please check")
 	}
-	var ret = make([][]byte, num/a.blockSize, num/a.blockSize+1)
+	var ret = make([][]byte, num/a.blockSize+1)
 	for i := 0; num > 0; i++ {
 		ret[i] = a.buf[i]
 		a.buf[i] = zpool.Get2(a.blockSize)
-		num -= a.blockSize
-		if num < 0 {
+		if num < a.blockSize {
 			sh := (*reflect.SliceHeader)(unsafe.Pointer(&ret[i]))
 			sh.Len = num + a.blockSize
 		}
+		num -= a.blockSize
 	}
 	return &ret
 }

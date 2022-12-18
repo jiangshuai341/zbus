@@ -54,7 +54,11 @@ func (que *TaskQueue) Enqueue(task *Task) {
 	que.q.Enqueue(task)
 }
 func (que *TaskQueue) Dequeue() *Task {
-	return que.q.Dequeue().(*Task)
+	task := que.q.Dequeue()
+	if task == nil {
+		return nil
+	}
+	return task.(*Task)
 }
 func (que *TaskQueue) IsEmpty() bool {
 	return que.q.IsEmpty()
@@ -189,6 +193,7 @@ func (p *Epoller) Epolling(callback func(fd int, ev uint32)) (err error) {
 			if fdHandling == int32(p.triggerFD) {
 				_, _ = syscall.Read(p.triggerFD, triggerReadBuf)
 				doTask = true
+				continue
 			}
 			callback(int(fdHandling), eventHandling)
 		}
