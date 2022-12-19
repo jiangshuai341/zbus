@@ -148,14 +148,16 @@ func (rb *RingBuffer) ReadFromString(s string) int {
 
 // LengthData returns the length of available bytes to read.
 func (rb *RingBuffer) LengthData() int {
-	head, tail := rb.PeekDataSpace()
-	return len(head) + len(tail)
+	temp := rb.w - rb.r
+	if temp >= 0 {
+		return temp
+	}
+	return temp + rb.size
 }
 
 // LengthFree returns the length of available bytes to write.
 func (rb *RingBuffer) LengthFree() int {
-	head, tail := rb.PeekFreeSpace()
-	return len(head) + len(tail)
+	return rb.size - rb.LengthData()
 }
 
 func (rb *RingBuffer) Cap() int {

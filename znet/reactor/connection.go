@@ -10,7 +10,7 @@ import (
 )
 
 type INetHandle interface {
-	OnTraffic(data *[][]byte) (discardNum int)
+	OnTraffic(*zbuf.CombinesBuffer)
 	OnClose()
 }
 
@@ -21,7 +21,6 @@ type Connection struct {
 	outboundBuffer *zbuf.LinkListBuffer // 出栈缓冲区
 	inboundBuffer  *zbuf.CombinesBuffer // 入栈缓冲区
 	reactor        *Reactor
-	tempPeek       [][]byte
 	INetHandle
 }
 
@@ -44,7 +43,6 @@ func newTCPConn(fd int) (*Connection, error) {
 		remoteAddr:     socket.SockaddrToTCPOrUnixAddr(rsa),
 		outboundBuffer: zbuf.NewLinkListBuffer(),
 		inboundBuffer:  zbuf.NewCombinesBuffer(1024 * 2),
-		tempPeek:       make([][]byte, 0, 8),
 	}, nil
 }
 
@@ -94,7 +92,7 @@ func (c *Connection) write(data []byte) {
 func (c *Connection) onTraffic() {
 	for {
 		prefix := c.reactor.tempReadBuffer.GetPrefix()
-		prefix[0], prefix[1] = c.inboundBuffer.PeekFreeSpace()
+		prefix[0], prefix[1] = c.inboundBuffer.PeekFreeAll()
 		n, err := epoll.Readv(c.fd, *c.reactor.tempReadBuffer.BufferWithPrefix())
 		if err == syscall.EAGAIN || err == syscall.EINTR || n == 0 {
 			break
@@ -107,9 +105,7 @@ func (c *Connection) onTraffic() {
 		n -= c.inboundBuffer.UpdateDataSpaceNum(n)
 		c.inboundBuffer.PushsNoCopy(c.reactor.tempReadBuffer.MoveTemp(n))
 	}
-	c.tempPeek = c.tempPeek[:0]
-	c.inboundBuffer.PeekDataSpace(&c.tempPeek)
-	c.inboundBuffer.Discard(c.INetHandle.OnTraffic(&c.tempPeek))
+	c.INetHandle.OnTraffic(c.inboundBuffer)
 }
 
 func (c *Connection) onTriggerWrite() {

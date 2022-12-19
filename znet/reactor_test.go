@@ -3,6 +3,7 @@ package znet
 import (
 	"github.com/jiangshuai341/zbus/logger"
 	"github.com/jiangshuai341/zbus/toolkit"
+	"github.com/jiangshuai341/zbus/zbuf"
 	"github.com/jiangshuai341/zbus/znet/reactor"
 	"net"
 	"reflect"
@@ -18,9 +19,20 @@ type TcpTask struct {
 
 var testLog = logger.GetLogger("ReactorTest")
 
-func (t *TcpTask) OnTraffic(data *[][]byte) (discardNum int) {
-	t.c.SendUnsafeNoCopy((*data)[0])
-	return 8
+func (t *TcpTask) OnTraffic(inboundBuffer *zbuf.CombinesBuffer) {
+	pakSize, err := inboundBuffer.PeekInt(4)
+	if err != nil {
+		return
+	}
+	dataLen := inboundBuffer.LengthData()
+
+	if int(pakSize) > dataLen-4 {
+		return
+	}
+
+	inboundBuffer.Discard(4)
+
+	inboundBuffer.PopData(int(pakSize))
 }
 func (t *TcpTask) OnClose() {
 
@@ -51,11 +63,11 @@ func OnAccept(conn *reactor.Connection) {
 	}
 }
 
-var accepters = make([]*reactor.Accepter, 10)
+//var accepters = make([]*reactor.Accepter, 10)
 
 func TestListen(t *testing.T) {
 	var err error
-	accepters, err = reactor.ActiveListener("0.0.0.0:9999", 1, OnAccept)
+	_, err = reactor.ActiveListener("0.0.0.0:9999", 1, OnAccept)
 	if err != nil {
 		t.Logf("ActiveListener Failed Err:%+v", err)
 		return
@@ -81,8 +93,14 @@ func TestClient(t *testing.T) {
 
 		for {
 			n, err := conn.Write(tempWrite)
+			if err != nil {
+				break
+			}
 			testLog.Infof("num:%d ret:%d err:%+v", n, num, err)
 			n, err = conn.Read(tempRead)
+			if err != nil {
+				break
+			}
 			testLog.Infof("num:%d ret:%d err:%+v", n, *readNum, err)
 			num++
 		}
