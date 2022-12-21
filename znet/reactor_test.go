@@ -6,7 +6,6 @@ import (
 	"github.com/jiangshuai341/zbus/zbuf"
 	"github.com/jiangshuai341/zbus/znet/reactor"
 	"net"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -25,15 +24,15 @@ func (t *TcpTask) OnTraffic(inboundBuffer *zbuf.CombinesBuffer) {
 		return
 	}
 	dataLen := inboundBuffer.LengthData()
-
 	if int(pakSize) > dataLen-4 {
 		return
 	}
-
 	inboundBuffer.Discard(4)
 
-	inboundBuffer.PopData(int(pakSize))
+	t.c.SendUnsafeNoCopy([]byte{byte(pakSize), byte(pakSize >> 8), byte(pakSize >> 16), byte(pakSize >> 24)})
+	t.c.SendUnsafeNoCopy(*inboundBuffer.PopData(int(pakSize)))
 }
+
 func (t *TcpTask) OnClose() {
 
 }
@@ -80,19 +79,26 @@ func TestClient(t *testing.T) {
 	var num = 1
 	var syncCtx sync.WaitGroup
 	syncCtx.Add(1)
+
+	var pakData = func(data []byte) []byte {
+		var ret = make([]byte, 4, 4+len(data))
+		*(*int32)(unsafe.Pointer(&ret[0])) = int32(len(data))
+		ret = append(ret, data...)
+		return ret
+	}
+
 	go func() {
 		var tempRead []byte = make([]byte, 1024)
 
-		var tempWrite []byte
-		a := (*reflect.SliceHeader)(unsafe.Pointer(&tempWrite))
-		a.Len = 8
-		a.Data = uintptr(unsafe.Pointer(&num))
-		a.Cap = 8
+		var tempWrite []byte = make([]byte, 256)
+		//var tempWrite []byte = make([]byte, 512)
+		//var tempWrite []byte = make([]byte, 1024)
+		//var tempWrite []byte = make([]byte, 2048)
 
 		var readNum *int64 = (*int64)(unsafe.Pointer(&tempRead[0]))
 
 		for {
-			n, err := conn.Write(tempWrite)
+			n, err := conn.Write(pakData(tempWrite))
 			if err != nil {
 				break
 			}

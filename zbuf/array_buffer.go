@@ -13,6 +13,12 @@ type ArrayBuffers struct {
 	prefixSize int
 }
 
+func NewArraryBuffers(numPrefix int, size int) *ArrayBuffers {
+	ret := &ArrayBuffers{}
+	ret.prefixSize = numPrefix
+	ret.reserve(size)
+	return ret
+}
 func (a *ArrayBuffers) BufferWithPrefix() *[][]byte {
 	return &a.buf
 }
@@ -20,7 +26,7 @@ func (a *ArrayBuffers) BufferWithoutPrefix() [][]byte {
 	return a.buf[a.prefixSize:]
 }
 
-func (a *ArrayBuffers) Reserve(newsize int) {
+func (a *ArrayBuffers) reserve(newsize int) {
 	mallocSize := newsize - a.size
 	if mallocSize <= 0 {
 		return
@@ -38,8 +44,8 @@ func (a *ArrayBuffers) Reserve(newsize int) {
 	}
 }
 func (a *ArrayBuffers) MoveTemp(num int) *[][]byte {
-	if num > a.size {
-		panic("moveTempHead arg error please check")
+	if num <= 0 || num > a.size {
+		return nil
 	}
 	var ret = make([][]byte, num/a.blockSize+1)
 	for i := 0; num > 0; i++ {
@@ -53,14 +59,7 @@ func (a *ArrayBuffers) MoveTemp(num int) *[][]byte {
 	}
 	return &ret
 }
-func (a *ArrayBuffers) SetPrefixSize(prefixSize int) {
-	a.prefixSize = prefixSize
-}
+
 func (a *ArrayBuffers) GetPrefix() [][]byte {
-	var ret [][]byte
-	sh := (*reflect.SliceHeader)(unsafe.Pointer(&ret))
-	sh.Len = a.prefixSize
-	sh.Cap = a.prefixSize
-	sh.Data = uintptr(unsafe.Pointer(&a.buf[0]))
-	return ret
+	return a.buf[:a.prefixSize]
 }

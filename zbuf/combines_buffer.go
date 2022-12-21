@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/jiangshuai341/zbus/zpool"
 	"math"
-	"reflect"
 	"unsafe"
 )
 
@@ -95,11 +94,13 @@ func (c *CombinesBuffer) PopData(num int) *[]byte {
 func (c *CombinesBuffer) Discard(num int) int {
 	temp := num
 	temp -= c.ringBuffer.Discard(num)
-	if num > 0 {
-		temp -= c.listBuffer.DiscardBytes(num)
+	if temp > 0 {
+		temp -= c.listBuffer.DiscardBytes(temp)
 	}
 	return num - temp
 }
+
+// UpdateDataSpaceNum 返回有多少数据成功标记写入
 func (c *CombinesBuffer) UpdateDataSpaceNum(newWriteNum int) int {
 	return c.ringBuffer.DataSpaceGrow(newWriteNum)
 }
@@ -114,22 +115,14 @@ func (c *CombinesBuffer) PushsNoCopy(temp *[][]byte) {
 var ErrDataNotEnough = errors.New("err : Data Not Enough Peek")
 
 // PeekInt 返回读取到的整型数值 最大64位  仅小端试用
-func (c *CombinesBuffer) PeekInt(byteNum int) (ret uint64, err error) {
-	ret = math.MaxUint64
+func (c *CombinesBuffer) PeekInt(byteNum int) (uint64, error) {
 	if c.LengthData() < byteNum {
-		err = ErrDataNotEnough
-		return
+		return math.MaxUint64, ErrDataNotEnough
 	}
 	if byteNum > 8 || byteNum < 0 {
 		byteNum = 8
 	}
-
-	var tempBytes []byte
-	sh := (*reflect.SliceHeader)(unsafe.Pointer(&tempBytes))
-	sh.Len = byteNum
-	sh.Cap = byteNum
-	sh.Data = uintptr(unsafe.Pointer(&ret))
-
+	var tempBytes []byte = make([]byte, 8)
 	var n = 0
 	for _, v := range *c.PeekData(byteNum) {
 		n += copy(tempBytes[n:], v)
@@ -137,5 +130,5 @@ func (c *CombinesBuffer) PeekInt(byteNum int) (ret uint64, err error) {
 			break
 		}
 	}
-	return
+	return *(*uint64)(unsafe.Pointer(&tempBytes[0])), nil
 }

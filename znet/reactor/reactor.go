@@ -14,7 +14,7 @@ var ErrNetHandle = errors.New("please init INetHandle conn before add")
 type Reactor struct {
 	epoller         *epoll.Epoller
 	conns           map[int]*Connection
-	tempReadBuffer  zbuf.ArrayBuffers
+	tempReadBuffer  *zbuf.ArrayBuffers
 	tempWriteBuffer [][]byte
 }
 
@@ -22,11 +22,9 @@ func NewReactor() (r *Reactor, err error) {
 	r = &Reactor{
 		conns:           make(map[int]*Connection),
 		epoller:         nil,
-		tempReadBuffer:  zbuf.ArrayBuffers{},
+		tempReadBuffer:  zbuf.NewArraryBuffers(2, 1024*10*5),
 		tempWriteBuffer: make([][]byte, 0),
 	}
-	//r.tempReadBuffer.Reserve(socket.SocketReadBufferSize)
-	r.tempReadBuffer.Reserve(1024 * 10 * 5)
 	r.epoller, err = epoll.OpenEpoller()
 	if err != nil {
 		return nil, err
@@ -40,10 +38,11 @@ func NewReactor() (r *Reactor, err error) {
 	return
 }
 
-// DoTaskInIoThread
+// DoTaskInIoThread 在IO线程中执行任务
 func (r *Reactor) DoTaskInIoThread(fn epoll.TaskFunc, arg ...any) error {
 	return r.epoller.AppendTask(fn, arg)
 }
+
 func (r *Reactor) DoUrgentTaskInIoThread(fn epoll.TaskFunc, arg ...any) error {
 	return r.epoller.AppendUrgentTask(fn, arg)
 }
@@ -71,7 +70,6 @@ func (r *Reactor) AddConn(conn *Connection) error {
 	if conn.INetHandle == nil {
 		return ErrNetHandle
 	}
-
 	return r.DoUrgentTaskInIoThread(func(a ...any) {
 		conn.reactor = r
 		r.conns[conn.fd] = conn

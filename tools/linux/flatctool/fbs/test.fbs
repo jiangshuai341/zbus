@@ -23,5 +23,4 @@ table Weapon {
   name:string;
   damage:short;
 }
-rpc_service 
-root_type Monster;
+
