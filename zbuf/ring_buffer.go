@@ -93,12 +93,12 @@ func (rb *RingBuffer) DataSpaceGrow(n int) int {
 	if n <= 0 {
 		return 0
 	}
-	rb.isEmpty = false
 	LengthFree := rb.LengthFree()
 	if n > LengthFree {
 		n = LengthFree
 	}
 	rb.w = (rb.w + n) % rb.size
+	rb.isEmpty = false
 	return n
 }
 
@@ -149,6 +149,9 @@ func (rb *RingBuffer) ReadFromString(s string) int {
 
 // LengthData returns the length of available bytes to read.
 func (rb *RingBuffer) LengthData() int {
+	if rb.isEmpty {
+		return 0
+	}
 	temp := rb.w - rb.r
 	if temp > 0 {
 		return temp

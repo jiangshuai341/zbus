@@ -22,7 +22,7 @@ func NewReactor() (r *Reactor, err error) {
 	r = &Reactor{
 		conns:           make(map[int]*Connection),
 		epoller:         nil,
-		tempReadBuffer:  zbuf.NewArraryBuffers(2, 1024*10*5),
+		tempReadBuffer:  zbuf.NewArraryBuffers(2, 1024*10*5, 1024),
 		tempWriteBuffer: make([][]byte, 0),
 	}
 	r.epoller, err = epoll.OpenEpoller()

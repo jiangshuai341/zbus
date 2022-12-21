@@ -13,9 +13,10 @@ type ArrayBuffers struct {
 	prefixSize int
 }
 
-func NewArraryBuffers(numPrefix int, size int) *ArrayBuffers {
+func NewArraryBuffers(numPrefix int, size int, blockSize int) *ArrayBuffers {
 	ret := &ArrayBuffers{}
 	ret.prefixSize = numPrefix
+	ret.blockSize = blockSize
 	ret.reserve(size)
 	return ret
 }
@@ -32,7 +33,12 @@ func (a *ArrayBuffers) reserve(newsize int) {
 		return
 	}
 	if a.buf == nil {
-		temp := zpool.Get()
+		var temp []byte
+		if a.blockSize > 0 {
+			temp = zpool.Get2(a.blockSize)
+		} else {
+			temp = zpool.Get()
+		}
 		a.blockSize = len(temp)
 		a.buf = make([][]byte, a.prefixSize, newsize/a.blockSize+a.prefixSize)
 		a.buf = append(a.buf, temp)
