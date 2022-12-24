@@ -12,12 +12,13 @@ import (
 )
 
 func TestListen(t *testing.T) {
-
+	runServer(1)
 	time.Sleep(1000000 * time.Second)
 }
 
 func TestClient(t *testing.T) {
-
+	runClient(1024*10*10, 1)
+	time.Sleep(1000000 * time.Second)
 }
 
 func BenchmarkSend(b *testing.B) {

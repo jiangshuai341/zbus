@@ -1,11 +1,12 @@
 #!/bin/bash
 
-output="/home/jiangshuai/EasyFrame/src/autogen/protocol"
-pak="--go-import easyframe/common/flatbuffers"
-base_import_path="--go-base-import-path easyframe/autogen/protocol/"
-language="--go --cpp"
+output="/home/jiangshuai/zbus/build/protocal"
+pak="--go-import github.com/jiangshuai341/zbus/flatbuffers"
+base_import_path="--go-base-import-path github.com/jiangshuai341/zbus/build/protocal/"
+language="--go --cpp --lua"
+option="--gen-object-api --reflect-names"
 rm -rf ${output}/*
-./flatc ${language} -o ${output} ${pak} ${base_import_path} --gen-object-api --go-packet  ./fbs/*.fbs
+./flatc ${language} -o ${output} ${pak} ${base_import_path} ${option} ./fbs/*.fbs
 
 
 
@@ -165,7 +166,7 @@ rm -rf ${output}/*
 #                         Prevents multiple type of annotations within a Fbs
 #                         SCHEMA file.Currently this is required to generate
 #                         private types in Rust
-#
+#  --go-packet gen in onefile gopack name
 #FILEs may be schemas (must end in .fbs), binary schemas (must end in .bfbs) or
 #JSON files (conforming to preceding schema). BINARY_FILEs after the -- must be
 #binary flatbuffer format files. Output files are named using the base file name

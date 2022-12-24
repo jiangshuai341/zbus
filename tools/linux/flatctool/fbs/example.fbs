@@ -1,0 +1,29 @@
+// Example IDL file for our monster's schema.
+include "include_example.fbs";
+
+namespace Example;
+
+enum Color:byte { Red = 0, Green, Blue = 2 }
+
+union Equipment { Weapon } // Optionally add more tables.
+
+table Weapon {
+  name:string;
+  damage:short;
+}
+
+
+table Monster {
+  pos:testinclude.Vec3;
+  mana:short = 150;
+  hp:short = 100;
+  name:string;
+  friendly:bool = false (deprecated);
+  inventory:[ubyte];
+  color:Color = Blue;
+  weapons:[Weapon];
+  equipped:Equipment;
+  path:[testinclude.Vec3];
+}
+
+root_type Monster;
