@@ -5,24 +5,29 @@ namespace Example;
 
 enum Color:byte { Red = 0, Green, Blue = 2 }
 
-union Equipment { Weapon } // Optionally add more tables.
+union Equipment { Weapon,Ammunition } // Optionally add more tables.
 
 table Weapon {
   name:string;
-  damage:short;
+  damage:int32;
 }
+
+table Ammunition {
+  name:string;
+  damage:int32;
+}
+
 
 
 table Monster {
   pos:testinclude.Vec3;
-  mana:short = 150;
-  hp:short = 100;
+  mana:int32 = 150;
+  hp:int32 = 100;
   name:string;
   friendly:bool = false (deprecated);
   inventory:[ubyte];
   color:Color = Blue;
   weapons:[Weapon];
-  equipped:Equipment;
   path:[testinclude.Vec3];
 }
 

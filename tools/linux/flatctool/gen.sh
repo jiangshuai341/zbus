@@ -4,7 +4,7 @@ output="/home/jiangshuai/zbus/build/protocal"
 pak="--go-import github.com/jiangshuai341/zbus/flatbuffers"
 base_import_path="--go-base-import-path github.com/jiangshuai341/zbus/build/protocal/"
 language="--go --cpp --lua"
-option="--gen-object-api --reflect-names"
+option="--gen-object-api --reflect-names --gen-mutable --gen-compare"
 rm -rf ${output}/*
 ./flatc ${language} -o ${output} ${pak} ${base_import_path} ${option} ./fbs/*.fbs
 
