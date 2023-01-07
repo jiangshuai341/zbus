@@ -7,15 +7,14 @@ import (
 	"unsafe"
 )
 
-var ips map[string]string
+var ips map[string]string // netInterfaceName ==> IP
 
-func InitIpTable() error {
+func initNetinterfaceIpMap() error {
 	ips = make(map[string]string)
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return err
 	}
-
 	for _, i := range interfaces {
 		byName, err := net.InterfaceByName(i.Name)
 		if err != nil {
@@ -36,7 +35,7 @@ func InitIpTable() error {
 	return nil
 }
 func GetIpByNetCardName(name string) string {
-	if ips == nil && InitIpTable() != nil {
+	if ips == nil {
 		return ""
 	}
 	return ips[name]

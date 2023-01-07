@@ -2,7 +2,7 @@
 
 #define
 #proto 生成输出目录
-PATH_OUTPUT=/home/jiangshuai/zbus/build/protocal2
+PATH_OUTPUT=/home/jiangshuai/zbus/build/pb
 #SRC_FILE=`find ./proto -maxdepth 1 -type f | grep .proto`
 #
 ##runtime

@@ -11,13 +11,13 @@ table Weapon {
   name:string;
   damage:int32;
 }
+root_type Weapon;
 
 table Ammunition {
   name:string;
   damage:int32;
 }
-
-
+root_type Ammunition;
 
 table Monster {
   pos:testinclude.Vec3;
@@ -29,6 +29,12 @@ table Monster {
   color:Color = Blue;
   weapons:[Weapon];
   path:[testinclude.Vec3];
+}
+
+rpc_service MonsterStorage {
+  Store(Monster):testinclude.Vec3 (streaming: "none");
+  Retrieve(Monster):Weapon (streaming: "server");
+  GetMaxHitPoint(Monster):Weapon (streaming: "client");
 }
 
 root_type Monster;
