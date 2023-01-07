@@ -2,11 +2,11 @@ package logger
 
 import "testing"
 
-func BenchmarkRogger(b *testing.B) {
-	SetLevel(DEBUG)
-	longStr := string(make([]byte, 1024))
+var longStr = string(make([]byte, 1024))
+
+func BenchmarkLogger(b *testing.B) {
+	SetGlobalConfig(DEBUG, ScrollByFileSize, 10, 100, true, "./log")
 	lg := GetLogger("TestLog")
-	lg.SetFileRoller("./logs", 10, 100)
 	for i := 0; i < b.N; i++ {
 		lg.Debug("debugxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 		lg.Info(longStr)

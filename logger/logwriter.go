@@ -9,18 +9,18 @@ import (
 )
 
 var (
-	CurrUnixTime int64
-	CurrDateTime string
-	CurrDateHour string
-	CurrDateDay  string
+	currUnixTime int64
+	currDateTime string
+	currDateHour string
+	currDateDay  string
 )
 
 func init() {
 	now := time.Now()
-	CurrUnixTime = now.Unix()
-	CurrDateTime = now.Format("2006-01-02 15:04:05")
-	CurrDateHour = now.Format("2006010215")
-	CurrDateDay = now.Format("20060102")
+	currUnixTime = now.Unix()
+	currDateTime = now.Format("2006-01-02 15:04:05")
+	currDateHour = now.Format("2006010215")
+	currDateDay = now.Format("20060102")
 	go func() {
 		tm := time.NewTimer(time.Second)
 		for {
@@ -29,32 +29,37 @@ func init() {
 			tm.Reset(d)
 			<-tm.C
 			now = time.Now()
-			CurrUnixTime = now.Unix()
-			CurrDateTime = now.Format("2006-01-02 15:04:05")
-			CurrDateHour = now.Format("2006010215")
-			CurrDateDay = now.Format("20060102")
+			currUnixTime = now.Unix()
+			currDateTime = now.Format("2006-01-02 15:04:05")
+			currDateHour = now.Format("2006010215")
+			currDateDay = now.Format("20060102")
 		}
 	}()
 }
 
-// DAY for rotate log by day
+// day for rotate log by day
 const (
-	DAY DateType = iota
-	HOUR
+	day dateType = iota
+	hour
 )
 
-// LogWriter is interface for different writer.
-type LogWriter interface {
+// logWriter is interface for different writer.
+type logWriter interface {
 	Write(v []byte)
 	NeedPrefix() bool
+	getOutFile() *os.File
 }
 
-// ConsoleWriter writes the logs to the console.
-type ConsoleWriter struct {
+// consoleWriter writes the logs to the console.
+type consoleWriter struct {
 }
 
-// RollFileWriter struct for rotate logs by file size.
-type RollFileWriter struct {
+func (c *consoleWriter) getOutFile() *os.File {
+	return os.Stdout
+}
+
+// rollFileWriter struct for rotate logs by file size.
+type rollFileWriter struct {
 	logpath  string
 	name     string
 	num      int
@@ -64,11 +69,15 @@ type RollFileWriter struct {
 	openTime int64
 }
 
-// DateWriter rotate logs by date.
-type DateWriter struct {
+func (w *rollFileWriter) getOutFile() *os.File {
+	return w.currFile
+}
+
+// dateWriter rotate logs by date.
+type dateWriter struct {
 	logpath   string
 	name      string
-	dateType  DateType
+	dateType  dateType
 	num       int
 	currDate  string
 	currFile  *os.File
@@ -76,17 +85,17 @@ type DateWriter struct {
 	hasPrefix bool
 }
 
-// HourWriter for rotate logs by hour
-type HourWriter struct {
+func (w *dateWriter) getOutFile() *os.File {
+	return w.currFile
 }
 
-// DateType is uint8
-type DateType uint8
+// dateType is uint8
+type dateType uint8
 
 func reOpenFile(path string, currFile **os.File, openTime *int64) {
-	*openTime = CurrUnixTime
+	*openTime = currUnixTime
 	if *currFile != nil {
-		(*currFile).Close()
+		_ = (*currFile).Close()
 	}
 	of, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err == nil {
@@ -95,18 +104,18 @@ func reOpenFile(path string, currFile **os.File, openTime *int64) {
 		fmt.Println("open log file error", err)
 	}
 }
-func (w *ConsoleWriter) Write(v []byte) {
-	os.Stdout.Write(v)
+func (w *consoleWriter) Write(v []byte) {
+	_, _ = os.Stdout.Write(v)
 }
 
 // NeedPrefix shows whether needs the prefix for the console writer.
-func (w *ConsoleWriter) NeedPrefix() bool {
+func (w *consoleWriter) NeedPrefix() bool {
 	return true
 }
 
 // Write for writing []byte to the writter.
-func (w *RollFileWriter) Write(v []byte) {
-	if w.currFile == nil || w.openTime+10 < CurrUnixTime {
+func (w *rollFileWriter) Write(v []byte) {
+	if w.currFile == nil || w.openTime+10 < currUnixTime {
 		fullPath := filepath.Join(w.logpath, w.name+".log")
 		reOpenFile(fullPath, &w.currFile, &w.openTime)
 	}
@@ -126,7 +135,7 @@ func (w *RollFileWriter) Write(v []byte) {
 			p1 := filepath.Join(w.logpath, w.name+n1+".log")
 			p2 := filepath.Join(w.logpath, w.name+n2+".log")
 			if _, err := os.Stat(p1); !os.IsNotExist(err) {
-				os.Rename(p1, p2)
+				_ = os.Rename(p1, p2)
 			}
 		}
 		fullPath := filepath.Join(w.logpath, w.name+".log")
@@ -134,9 +143,9 @@ func (w *RollFileWriter) Write(v []byte) {
 	}
 }
 
-// NewRollFileWriter returns a RollFileWriter, rotate logs in sizeMB , and num files are keeped.
-func NewRollFileWriter(logpath, name string, num, sizeMB int) *RollFileWriter {
-	w := &RollFileWriter{
+// newRollFileWriter returns a rollFileWriter, rotate logs in sizeMB , and num files are keeped.
+func newRollFileWriter(logpath, name string, num, sizeMB int) *rollFileWriter {
+	w := &rollFileWriter{
 		logpath: logpath,
 		name:    name,
 		num:     num,
@@ -151,45 +160,45 @@ func NewRollFileWriter(logpath, name string, num, sizeMB int) *RollFileWriter {
 }
 
 // NeedPrefix shows need prefix or not.
-func (w *RollFileWriter) NeedPrefix() bool {
+func (w *rollFileWriter) NeedPrefix() bool {
 	return true
 }
 
-func (w *DateWriter) isExpired() bool {
+func (w *dateWriter) isExpired() bool {
 	currDate := w.getCurrDate()
 	return w.currDate != currDate
 }
 
-// Write method implement for the DateWriter
-func (w *DateWriter) Write(v []byte) {
+// Write method implement for the dateWriter
+func (w *dateWriter) Write(v []byte) {
 	if w.isExpired() {
 		w.currDate = w.getCurrDate()
 		//w.cleanOldLogs()
 		fullPath := filepath.Join(w.logpath, w.name+"_"+w.currDate+".log")
 		reOpenFile(fullPath, &w.currFile, &w.openTime)
 	}
-	if w.currFile == nil || w.openTime+10 < CurrUnixTime {
+	if w.currFile == nil || w.openTime+10 < currUnixTime {
 		fullPath := filepath.Join(w.logpath, w.name+"_"+w.currDate+".log")
 		reOpenFile(fullPath, &w.currFile, &w.openTime)
 	}
 	if w.currFile == nil {
 		return
 	}
-	w.currFile.Write(v)
+	_, _ = w.currFile.Write(v)
 }
 
-// NeedPrefix shows whether needs prefix info for DateWriter or not.
-func (w *DateWriter) NeedPrefix() bool {
+// NeedPrefix shows whether needs prefix info for dateWriter or not.
+func (w *dateWriter) NeedPrefix() bool {
 	return w.hasPrefix
 }
 
-func (w *DateWriter) SetPrefix(enable bool) {
+func (w *dateWriter) SetPrefix(enable bool) {
 	w.hasPrefix = enable
 }
 
-// NewDateWriter returns a writer which keeps logs in hours or day format.
-func NewDateWriter(logpath, name string, dateType DateType, num int) *DateWriter {
-	w := &DateWriter{
+// newDateWriter returns a writer which keeps logs in hours or day format.
+func newDateWriter(logpath, name string, dateType dateType, num int) *dateWriter {
+	w := &dateWriter{
 		logpath:   logpath,
 		name:      name,
 		num:       num,
@@ -200,10 +209,10 @@ func NewDateWriter(logpath, name string, dateType DateType, num int) *DateWriter
 	return w
 }
 
-func (w *DateWriter) cleanOldLogs() {
+func (w *dateWriter) cleanOldLogs() {
 	format := "20060102"
 	duration := -time.Hour * 24
-	if w.dateType == HOUR {
+	if w.dateType == hour {
 		format = "2006010215"
 		duration = -time.Hour
 	}
@@ -215,15 +224,15 @@ func (w *DateWriter) cleanOldLogs() {
 		k := t.Format(format)
 		fullPath := filepath.Join(w.logpath, w.name+"_"+k+".log")
 		if _, err := os.Stat(fullPath); !os.IsNotExist(err) {
-			os.Remove(fullPath)
+			_ = os.Remove(fullPath)
 		}
 	}
 	return
 }
 
-func (w *DateWriter) getCurrDate() string {
-	if w.dateType == HOUR {
-		return CurrDateHour
+func (w *dateWriter) getCurrDate() string {
+	if w.dateType == hour {
+		return currDateHour
 	}
-	return CurrDateDay // DAY
+	return currDateDay // day
 }
