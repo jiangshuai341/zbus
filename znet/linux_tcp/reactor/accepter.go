@@ -1,7 +1,7 @@
 package reactor
 
 import (
-	"github.com/jiangshuai341/zbus/znet/epoll"
+	"github.com/jiangshuai341/zbus/znet/linux_tcp/epoll"
 	"github.com/jiangshuai341/zbus/znet/socket"
 	"runtime"
 	"syscall"

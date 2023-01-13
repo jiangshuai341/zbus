@@ -3,8 +3,8 @@ package reactor
 import (
 	"errors"
 	"github.com/jiangshuai341/zbus/logger"
-	"github.com/jiangshuai341/zbus/zbuf"
-	"github.com/jiangshuai341/zbus/znet/epoll"
+	"github.com/jiangshuai341/zbus/zbuffer"
+	"github.com/jiangshuai341/zbus/znet/linux_tcp/epoll"
 	"syscall"
 )
 
@@ -12,18 +12,19 @@ var log = logger.GetLogger("reactor")
 var ErrNetHandle = errors.New("please init INetHandle conn before add")
 
 type Reactor struct {
-	epoller         *epoll.Epoller
-	conns           map[int]*Connection
-	tempReadBuffer  *zbuf.ArrayBuffers
-	tempWriteBuffer [][]byte
+	epoller *epoll.Epoller
+	conns   map[int]*Connection
+
+	riovc *zbuffer.IovcArray
+	wiovc []epoll.Iovec // 4*
 }
 
 func NewReactor() (r *Reactor, err error) {
 	r = &Reactor{
-		conns:           make(map[int]*Connection),
-		epoller:         nil,
-		tempReadBuffer:  zbuf.NewArraryBuffers(2, 1024*10*5, 1024),
-		tempWriteBuffer: make([][]byte, 0),
+		conns:   make(map[int]*Connection),
+		epoller: nil,
+		riovc:   zbuffer.NewIocvArr(2, 1024*10*5, 1024),
+		wiovc:   make([]epoll.Iovec, 128),
 	}
 	r.epoller, err = epoll.OpenEpoller()
 	if err != nil {

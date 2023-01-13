@@ -1,6 +1,7 @@
 package epoll
 
 import (
+	"reflect"
 	"syscall"
 	"unsafe"
 )
@@ -12,8 +13,7 @@ type Iovec struct {
 	Len  uint64
 }
 
-func Readv(fd int, buffers [][]byte) (int, error) {
-	iovecs := bytes2iovec(buffers)
+func Readv(fd int, iovecs []Iovec) (int, error) {
 	if len(iovecs) == 0 {
 		return 0, nil
 	}
@@ -24,13 +24,11 @@ func Readv(fd int, buffers [][]byte) (int, error) {
 	}
 	return int(n), err
 }
-func Writev(fd int, buffers [][]byte) (int, error) {
-	var ptr unsafe.Pointer
-	iovecs := bytes2iovec(buffers)
+func Writev(fd int, iovecs []Iovec) (int, error) {
 	if len(iovecs) == 0 {
 		return 0, nil
 	}
-	ptr = unsafe.Pointer(&iovecs[0])
+	ptr := unsafe.Pointer(&iovecs[0])
 	n, _, err := syscall.Syscall(syscall.SYS_WRITEV, uintptr(fd), uintptr(ptr), uintptr(len(iovecs)))
 	if err == 0 {
 		return int(n), nil
@@ -38,7 +36,7 @@ func Writev(fd int, buffers [][]byte) (int, error) {
 	return int(n), err
 }
 
-func bytes2iovec(bs [][]byte) []Iovec {
+func Slices2Iovec(bs [][]byte) []Iovec {
 	iovecs := make([]Iovec, len(bs))
 	for i, b := range bs {
 		iovecs[i].Len = uint64(len(b))
@@ -49,4 +47,22 @@ func bytes2iovec(bs [][]byte) []Iovec {
 		}
 	}
 	return iovecs
+}
+
+func Slice2Iovec(bs []byte) Iovec {
+	ret := Iovec{Len: uint64(len(bs))}
+	if len(bs) == 0 {
+		ret.Base = (*byte)(unsafe.Pointer(&_zero))
+	} else {
+		ret.Base = &bs[0]
+	}
+	return ret
+}
+
+func (i *Iovec) MoveToSlice(header *reflect.SliceHeader) {
+	header.Len = int(i.Len)
+	header.Data = uintptr(unsafe.Pointer(i.Base))
+	header.Cap = int(i.Len)
+	i.Len = 0
+	i.Base = nil
 }

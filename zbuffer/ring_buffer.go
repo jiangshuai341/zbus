@@ -1,10 +1,9 @@
-package zbuf
+package zbuffer
 
 import (
 	"errors"
 	"github.com/jiangshuai341/zbus/toolkit"
 	"github.com/jiangshuai341/zbus/zpool"
-	"io"
 )
 
 const (
@@ -28,7 +27,7 @@ func NewRingBuffer(size int) *RingBuffer {
 		return &RingBuffer{isEmpty: true}
 	}
 	return &RingBuffer{
-		buf:     zpool.Get2(size),
+		buf:     zpool.GetBuffer2(size),
 		size:    size,
 		isEmpty: true,
 	}
@@ -199,10 +198,10 @@ func (rb *RingBuffer) grow(newCap int) {
 	if newCap <= DefaultBufferSize {
 		newCap = DefaultBufferSize
 	}
-	newBuf := zpool.Get2(newCap)
+	newBuf := zpool.GetBuffer2(newCap)
 	oldLen := rb.LengthData()
 	_, _ = rb.WriteToSlice(newBuf)
-	zpool.Put(rb.buf)
+	zpool.PutBuffer(rb.buf)
 	rb.buf = newBuf
 	rb.r = 0
 	rb.w = oldLen
@@ -210,63 +209,4 @@ func (rb *RingBuffer) grow(newCap int) {
 	if rb.w > 0 {
 		rb.isEmpty = false
 	}
-}
-
-var ReadFromErrInvalidReadCount = errors.New("RingBuffer.ReadFrom: invalid WriteToSlice count")
-var WriteToErrInvalidWriteCount = errors.New("RingBuffer.WriteTo: invalid Write count")
-
-// WriteTo implements io.WriterTo.
-func (rb *RingBuffer) WriteTo(w io.Writer) (int64, error) {
-	if rb.isEmpty {
-		return 0, ErrIsEmpty
-	}
-	head, tail := rb.PeekDataSpace()
-
-	n1, err := w.Write(head)
-	if err != nil {
-		return int64(n1), err
-	}
-	if n1 > len(head) || n1 < 0 {
-		return 0, WriteToErrInvalidWriteCount
-	}
-	if n1 < len(head) {
-		return int64(n1), nil
-	}
-
-	n2, err := w.Write(tail)
-	if err != nil {
-		return int64(n1 + n2), err
-	}
-	if n2 > len(tail) || n2 < 0 {
-		return 0, WriteToErrInvalidWriteCount
-	}
-	return int64(n1 + n2), nil
-}
-
-// ReadFrom implements io.ReaderFrom.
-func (rb *RingBuffer) ReadFrom(r io.Reader) (int64, error) {
-	if rb.IsFull() {
-		return 0, ErrIsFull
-	}
-	head, tail := rb.PeekFreeSpace()
-
-	n1, err := r.Read(head)
-	if err != nil {
-		return int64(n1), err
-	}
-	if n1 > len(head) || n1 < 0 {
-		return 0, ReadFromErrInvalidReadCount
-	}
-	if n1 < len(head) {
-		return int64(n1), nil
-	}
-
-	n2, err := r.Read(tail)
-	if err != nil {
-		return int64(n2 + n1), err
-	}
-	if n1 > len(head) || n1 < 0 {
-		return 0, ReadFromErrInvalidReadCount
-	}
-	return int64(n1 + n2), nil
 }

@@ -38,9 +38,9 @@ const (
 // global Config
 var (
 	logLevel            = DEBUG
-	logMode     LogMode = Console
+	logMode     LogMode = ScrollByFileSize
 	colored             = false
-	maxFileNum          = 1
+	maxFileNum          = 10
 	maxFileSize         = 100 //MB
 	logDirPath          = "./log"
 
@@ -83,6 +83,7 @@ func SetGlobalConfig(level LogLevel, mode LogMode, maxLogFileNum int, maxLogFile
 		logDirPath = dirPath
 
 		isDo = true
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05.000") + "| SetGlobalConfig Succ")
 	})
 
 	if !isDo {

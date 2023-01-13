@@ -1,8 +1,8 @@
 package reactor
 
 import (
-	"github.com/jiangshuai341/zbus/zbuf"
-	"github.com/jiangshuai341/zbus/znet/epoll"
+	"github.com/jiangshuai341/zbus/zbuffer"
+	"github.com/jiangshuai341/zbus/znet/linux_tcp/epoll"
 	"github.com/jiangshuai341/zbus/znet/socket"
 	"net"
 	"os"
@@ -10,16 +10,16 @@ import (
 )
 
 type INetHandle interface {
-	OnTraffic(*zbuf.CombinesBuffer)
+	OnTraffic(*zbuffer.CombinesBuffer)
 	OnClose()
 }
 
 type Connection struct {
-	fd             int                  // file descriptor
-	localAddr      net.Addr             // local addr
-	remoteAddr     net.Addr             // remote addr
-	outboundBuffer *zbuf.LinkListBuffer // 出栈缓冲区
-	inboundBuffer  *zbuf.CombinesBuffer // 入栈缓冲区
+	fd             int                     // file descriptor
+	localAddr      net.Addr                // local addr
+	remoteAddr     net.Addr                // remote addr
+	outboundBuffer *zbuffer.LinkListBuffer // 出栈缓冲区
+	inboundBuffer  *zbuffer.CombinesBuffer // 入栈缓冲区
 	reactor        *Reactor
 	INetHandle
 }
@@ -41,33 +41,21 @@ func newTCPConn(fd int) (*Connection, error) {
 		fd:             fd,
 		localAddr:      socket.SockaddrToTCPOrUnixAddr(lsa),
 		remoteAddr:     socket.SockaddrToTCPOrUnixAddr(rsa),
-		outboundBuffer: zbuf.NewLinkListBuffer(),
-		inboundBuffer:  zbuf.NewCombinesBuffer(1024 * 2),
+		outboundBuffer: zbuffer.NewLinkListBuffer(),
+		inboundBuffer:  zbuffer.NewCombinesBuffer(1024 * 2),
 	}, nil
 }
 
-func (c *Connection) SendSafe(data []byte) error {
-	return c.reactor.epoller.AppendTask(func(e *epoll.Epoller) {
-		c.SendUnsafe(data)
+// SendSafeZeroCopy 线程安全
+func (c *Connection) SendSafeZeroCopy(data ...[]byte) error {
+	return c.reactor.epoller.AppendTask(func(p *epoll.Epoller) {
+		c.SendUnsafeZeroCopy(data...)
 	})
 }
 
-// SendSafeNoCopy 线程安全
-func (c *Connection) SendSafeNoCopy(data []byte) error {
-	return c.reactor.epoller.AppendTask(func(e *epoll.Epoller) {
-		c.SendUnsafeNoCopy(data)
-	})
-}
-
-// SendUnsafe 非线程安全
-func (c *Connection) SendUnsafe(data []byte) {
-	temp := c.outboundBuffer.NewBytesFromPool(len(data))
-	copy(temp, data)
-	c.write(temp)
-}
-
-func (c *Connection) SendUnsafeNoCopy(data []byte) {
-	c.write(data)
+// SendSafeZeroCopy 非线程安全
+func (c *Connection) SendUnsafeZeroCopy(data ...[]byte) {
+	c.write(data...)
 }
 func (c *Connection) onRemoteClose() {
 	delete(c.reactor.conns, c.fd)
@@ -75,21 +63,20 @@ func (c *Connection) onRemoteClose() {
 	c.INetHandle.OnClose()
 }
 
-func (c *Connection) write(data []byte) {
+func (c *Connection) write(data ...[]byte) {
 	if c.outboundBuffer.IsEmpty() {
-		c.outboundBuffer.PushNoCopy(&data)
+		c.outboundBuffer.PushsNoCopy(&data)
 		//writeSocketDirectly 利用EPOLLET的虹吸效应 激活EPOLL ET
 		c.onTriggerWrite()
 	} else {
-		c.outboundBuffer.PushNoCopy(&data)
+		c.outboundBuffer.PushsNoCopy(&data)
 	}
 }
 
 func (c *Connection) onTraffic() {
 	for {
-		prefix := c.reactor.tempReadBuffer.GetPrefix()
-		prefix[0], prefix[1] = c.inboundBuffer.PeekFreeAll()
-		n, err := epoll.Readv(c.fd, *c.reactor.tempReadBuffer.BufferWithPrefix())
+		c.reactor.riovc.SetPrefix(c.inboundBuffer.PeekRingBufferFreeSpace())
+		n, err := epoll.Readv(c.fd, c.reactor.riovc.BufferWithPrefix())
 		if err == syscall.EAGAIN || err == syscall.EINTR || n == 0 {
 			break
 		}
@@ -99,7 +86,7 @@ func (c *Connection) onTraffic() {
 			return
 		}
 		n -= c.inboundBuffer.UpdateDataSpaceNum(n)
-		c.inboundBuffer.PushsNoCopy(c.reactor.tempReadBuffer.MoveTemp(n))
+		c.inboundBuffer.PushsNoCopy(c.reactor.riovc.MoveTemp(n))
 	}
 	c.INetHandle.OnTraffic(c.inboundBuffer)
 }
@@ -109,11 +96,10 @@ func (c *Connection) onTriggerWrite() {
 		return
 	}
 	for {
-		c.reactor.tempWriteBuffer = c.reactor.tempWriteBuffer[:0]
-		c.outboundBuffer.Peek(-1, &c.reactor.tempWriteBuffer)
-		n, err := epoll.Writev(c.fd, c.reactor.tempWriteBuffer)
+		c.outboundBuffer.PeekToIovecs(&c.reactor.wiovc)
+		n, err := epoll.Writev(c.fd, c.reactor.wiovc)
 		if err == syscall.EAGAIN || err == syscall.EINTR || n == 0 {
-			c.outboundBuffer.DiscardBytes(n)
+			c.outboundBuffer.Discard(n)
 			break
 		}
 		if n < 0 || err != nil {
@@ -121,6 +107,6 @@ func (c *Connection) onTriggerWrite() {
 			log.Errorf("[onTriggerWrite] [Connection will close] syscall Writev return:%d err:%+v ", n, err)
 			return
 		}
-		c.outboundBuffer.DiscardBytes(n)
+		c.outboundBuffer.Discard(n)
 	}
 }

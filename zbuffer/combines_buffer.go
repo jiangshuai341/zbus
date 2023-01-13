@@ -1,4 +1,4 @@
-package zbuf
+package zbuffer
 
 import (
 	"errors"
@@ -20,7 +20,7 @@ func NewCombinesBuffer(ringSize int) *CombinesBuffer {
 		peekTemp:   make([][]byte, 0),
 	}
 }
-func (c *CombinesBuffer) PeekFreeAll() (head []byte, tail []byte) {
+func (c *CombinesBuffer) PeekRingBufferFreeSpace() (head []byte, tail []byte) {
 	if !c.listBuffer.IsEmpty() {
 		return nil, nil
 	}
@@ -75,27 +75,36 @@ func (c *CombinesBuffer) PeekData(num int) *[][]byte {
 	return &c.peekTemp
 }
 
-func (c *CombinesBuffer) PopData(num int) *[]byte {
+func (c *CombinesBuffer) PopData(num int) []byte {
 	if num > c.LengthData() {
 		return nil
 	}
 	if num < 0 {
 		num = c.LengthData()
 	}
-	ret := zpool.Get2(num)
+	ret := zpool.GetBuffer2(num)
 	var n int
 	for _, v := range *c.PeekData(num) {
 		n += copy(ret[n:], v)
 	}
 	c.Discard(num)
-	return &ret
+	return ret
 }
-
+func (c *CombinesBuffer) PopsData(num int) [][]byte {
+	if num > c.LengthData() {
+		return nil
+	}
+	if num < 0 {
+		num = c.LengthData()
+	}
+	defer c.Discard(num)
+	return *c.PeekData(num)
+}
 func (c *CombinesBuffer) Discard(num int) int {
 	temp := num
 	temp -= c.ringBuffer.Discard(num)
 	if temp > 0 {
-		temp -= c.listBuffer.DiscardBytes(temp)
+		temp -= c.listBuffer.Discard(temp)
 	}
 	return num - temp
 }

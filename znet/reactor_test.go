@@ -1,7 +1,7 @@
 package znet
 
 import (
-	"github.com/jiangshuai341/zbus/znet/reactor"
+	reactor2 "github.com/jiangshuai341/zbus/znet/linux_tcp/reactor"
 	"io"
 	"net"
 	"sync"
@@ -10,18 +10,24 @@ import (
 	"unsafe"
 )
 
+// syscall writev :  60.85
+// syscall readv :  26.12
+// syscall epoll_wait :  5.75
+// syscall total 92.72
+
 func TestListen(t *testing.T) {
 	runServer(1)
-	time.Sleep(1000000 * time.Second)
+	time.Sleep(100 * time.Second)
 }
 
 func TestClient(t *testing.T) {
-	runClient(1024*10*10, 1)
-	time.Sleep(1000000 * time.Second)
+
+	runClient(1024, 10)
+	time.Sleep(100 * time.Second)
 }
 
 func runServer(num int) {
-	_, _ = reactor.ActiveListener("0.0.0.0:9999", num, OnAccept)
+	_, _ = reactor2.ActiveListener("0.0.0.0:9999", num, OnAccept)
 }
 
 func runClient(dataBlockSize int, clientNum int) {

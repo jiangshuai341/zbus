@@ -1,9 +1,7 @@
-package zbuf
+package zbuffer
 
 import (
-	"errors"
 	"github.com/jiangshuai341/zbus/zpool"
-	"io"
 )
 
 type node struct {
@@ -34,7 +32,7 @@ func NewLinkListBuffer() *LinkListBuffer {
 
 // NewBytesFromPool 必不为空
 func (llb *LinkListBuffer) NewBytesFromPool(len int) []byte {
-	return zpool.Get2(len)
+	return zpool.GetBuffer2(len)
 }
 
 // ListLength 链表长度
@@ -55,7 +53,7 @@ func (llb *LinkListBuffer) IsEmpty() bool {
 // Reset 删除所有元素
 func (llb *LinkListBuffer) Reset() {
 	for b := llb.pop(); b != nil; b = llb.pop() {
-		zpool.Put(b.buf)
+		zpool.PutBuffer(b.buf)
 	}
 	llb.head = nil
 	llb.tail = nil
@@ -63,18 +61,6 @@ func (llb *LinkListBuffer) Reset() {
 	llb.bytes = 0
 }
 
-func (llb *LinkListBuffer) Emplace(num int, ret *[][]byte) {
-	*ret = (*ret)[:0]
-	if num <= 0 {
-		return
-	}
-	for num > 0 {
-		temp := zpool.Get()
-		*ret = append(*ret, temp)
-		llb.PushNoCopy(&temp)
-		num -= len(temp)
-	}
-}
 func min(a int, b int) int {
 	if a < b {
 		return a
@@ -94,8 +80,8 @@ func (llb *LinkListBuffer) Peek(needNum int, ret *[][]byte) {
 	}
 }
 
-// DiscardBytes removes some nodes based on n bytes.
-func (llb *LinkListBuffer) DiscardBytes(n int) (discarded int) {
+// Discard removes some nodes based on n bytes.
+func (llb *LinkListBuffer) Discard(n int) (discarded int) {
 	if n <= 0 {
 		return
 	}
@@ -112,23 +98,7 @@ func (llb *LinkListBuffer) DiscardBytes(n int) (discarded int) {
 		}
 		n -= b.len()
 		discarded += b.len()
-		zpool.Put(b.buf)
-	}
-	return
-}
-
-// DiscardNodeNum removes some nodes based on n NodeNum.
-func (llb *LinkListBuffer) DiscardNodeNum(n int) (discarded int) {
-	if n <= 0 {
-		return
-	}
-	for ; n != 0 && llb.size != 0; n-- {
-		node := llb.pop()
-		if node == nil {
-			break
-		}
-		discarded++
-		zpool.Put(node.buf)
+		zpool.PutBuffer(b.buf)
 	}
 	return
 }
@@ -138,7 +108,7 @@ func (llb *LinkListBuffer) Push(p []byte) {
 	if n == 0 {
 		return
 	}
-	b := zpool.Get2(n)
+	b := zpool.GetBuffer2(n)
 	copy(b, p)
 	llb.pushBack(&node{buf: b})
 }
@@ -159,48 +129,6 @@ func (llb *LinkListBuffer) PushsNoCopy(p *[][]byte) {
 		}
 		llb.pushBack(&node{buf: (*p)[i]})
 	}
-}
-
-var WriteCountErr = errors.New("LinkListBuffer.WriteTo: invalid Write count")
-var ReadCountErr = errors.New("LinkListBuffer.ReadFrom: invalid WriteToSlice count")
-
-// WriteTo implements io.WriterTo.
-func (llb *LinkListBuffer) WriteTo(w io.Writer) (n int64, err error) {
-	var m int
-	for b := llb.pop(); b != nil; b = llb.pop() {
-		m, err = w.Write(b.buf)
-		if m > b.len() {
-			return int64(m), WriteCountErr
-		}
-		n += int64(m)
-		if err != nil {
-			return
-		}
-		if m < b.len() {
-			b.buf = b.buf[n:]
-			llb.pushFront(b)
-			return n, io.ErrShortWrite
-		}
-		zpool.Put(b.buf)
-	}
-	return
-}
-
-// ReadFrom implements io.ReaderFrom.
-func (llb *LinkListBuffer) ReadFrom(r io.Reader) (int64, error) {
-	b := zpool.Get()
-	n, err := r.Read(b)
-	if n < 0 {
-		return int64(n), ReadCountErr
-	}
-	b = b[:n]
-
-	if err != nil && err != io.EOF {
-		zpool.Put(b)
-		return int64(n), err
-	}
-	llb.pushBack(&node{buf: b})
-	return int64(n), nil
 }
 
 // pushFront adds the new node to the head of l.

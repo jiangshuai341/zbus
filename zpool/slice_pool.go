@@ -10,13 +10,6 @@ import (
 	"unsafe"
 )
 
-func NewSlicePool() *slicePool {
-	return &slicePool{defaultBitSize: minBitSize}
-}
-func Get() []byte          { return defaultSlicePool.Get() }
-func Get2(size int) []byte { return defaultSlicePool.Get2(size) }
-func Put(b []byte)         { defaultSlicePool.Put(b) }
-
 const (
 	minBitSize uint32 = 6 // CPU cache line bitSize 64bit
 	poolNum           = 20
@@ -25,7 +18,7 @@ const (
 	maxPercentile           = 0.95
 )
 
-type slicePool struct {
+type slicePool[T any] struct {
 	callCounter   [poolNum]uint64
 	isCalibrating uint64
 
@@ -35,17 +28,12 @@ type slicePool struct {
 	pools [poolNum]sync.Pool
 }
 
-var defaultSlicePool slicePool
-
-func init() {
-	defaultSlicePool.defaultBitSize = minBitSize
-}
-func (p *slicePool) Get() (buf []byte) {
+func (p *slicePool[T]) Get() (buf []T) {
 	defaultBitSize := atomic.LoadUint32(&p.defaultBitSize)
 	bufLen := 1 << defaultBitSize
 	ptr, _ := p.pools[defaultBitSize].Get().(unsafe.Pointer)
 	if ptr == nil {
-		return make([]byte, bufLen, bufLen)
+		return make([]T, bufLen, bufLen)
 	}
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
 	sh.Data = uintptr(ptr)
@@ -55,12 +43,12 @@ func (p *slicePool) Get() (buf []byte) {
 	return
 }
 
-func (p *slicePool) Get2(size int) (buf []byte) {
+func (p *slicePool[T]) Get2(size int) (buf []T) {
 	idx := index(size)
 	bitSize := uint32(idx) + minBitSize
 	ptr, _ := p.pools[idx].Get().(unsafe.Pointer)
 	if ptr == nil {
-		return make([]byte, 1<<bitSize)[:size]
+		return make([]T, 1<<bitSize)[:size]
 	}
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
 	sh.Data = uintptr(ptr)
@@ -70,7 +58,7 @@ func (p *slicePool) Get2(size int) (buf []byte) {
 	return
 }
 
-func (p *slicePool) Put(buf []byte) {
+func (p *slicePool[T]) Put(buf []T) {
 	size := cap(buf)
 	if size == 0 || uint32(size) > 1<<poolNum+minBitSize || uint32(size) < 1<<minBitSize {
 		return
@@ -83,14 +71,14 @@ func (p *slicePool) Put(buf []byte) {
 	if atomic.AddUint64(&p.callCounter[idx], 1) > calibrateCallsThreshold {
 		p.calibrate()
 	}
-
 	maxBitSize := int(atomic.LoadUint32(&p.maxBitSize))
 	if maxBitSize == 0 || size <= maxBitSize {
-		p.pools[idx].Put(unsafe.Pointer(&buf[:1][0]))
+		return
 	}
+	p.pools[idx].Put(unsafe.Pointer(&buf[:1][0]))
 }
 
-func (p *slicePool) calibrate() {
+func (p *slicePool[T]) calibrate() {
 	if !atomic.CompareAndSwapUint64(&p.isCalibrating, 0, 1) {
 		return
 	}

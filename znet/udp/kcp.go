@@ -259,12 +259,12 @@ func NewKCP(conv uint32, output output_callback) *KCP {
 }
 
 func (kcp *KCP) newSegment(size int) (seg segment) {
-	seg.data = zpool.Get2(size)
+	seg.data = zpool.GetBuffer2(size)
 	return
 }
 func (kcp KCP) delSegment(seg *segment) {
 	if seg.data != nil {
-		zpool.Put(seg.data)
+		zpool.PutBuffer(seg.data)
 	}
 }
 func (kcp *KCP) remove_front(q []segment, n int) []segment {
@@ -508,7 +508,7 @@ func (kcp *KCP) parse_data(newseg segment) bool {
 	}
 
 	if !repeat {
-		dataCopy := zpool.Get2(len(newseg.data))
+		dataCopy := zpool.GetBuffer2(len(newseg.data))
 		copy(dataCopy, newseg.data)
 		newseg.data = dataCopy
 
