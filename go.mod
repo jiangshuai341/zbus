@@ -2,9 +2,10 @@ module github.com/jiangshuai341/zbus
 
 go 1.18
 
-//
-// ETCD Client V3 Require
-require go.etcd.io/etcd/client/v3 v3.5.6
+require (
+	go.etcd.io/etcd/client/v3 v3.5.6
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
+)
 
 require (
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -23,4 +24,3 @@ require (
 	google.golang.org/grpc v1.41.0 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
 )
-
