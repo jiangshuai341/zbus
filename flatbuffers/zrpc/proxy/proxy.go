@@ -3,8 +3,8 @@ package proxy
 import (
 	"github.com/jiangshuai341/zbus/flatbuffers/zrpc/common"
 	"github.com/jiangshuai341/zbus/toolkit"
-	"github.com/jiangshuai341/zbus/zbuf"
-	"github.com/jiangshuai341/zbus/znet/reactor"
+	"github.com/jiangshuai341/zbus/zbuffer"
+	"github.com/jiangshuai341/zbus/znet/linux_tcp/reactor"
 	"strconv"
 )
 
@@ -61,7 +61,7 @@ type NetTask struct {
 	c *reactor.Connection
 }
 
-func (t *NetTask) OnTraffic(inboundBuffer *zbuf.CombinesBuffer) {
+func (t *NetTask) OnTraffic(inboundBuffer *zbuffer.CombinesBuffer) {
 	pakSize, err := inboundBuffer.PeekInt(0, 4)
 
 	if err != nil {

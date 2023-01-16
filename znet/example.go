@@ -1,8 +1,8 @@
 package znet
 
 import (
-	"github.com/jiangshuai341/zbus/zbuf"
-	"github.com/jiangshuai341/zbus/znet/reactor"
+	"github.com/jiangshuai341/zbus/zbuffer"
+	"github.com/jiangshuai341/zbus/znet/linux_tcp/reactor"
 )
 
 var reactorMgr = NewReactorMgr()
@@ -34,7 +34,7 @@ func OnAccept(conn *reactor.Connection) {
 	}
 }
 
-func (t *NetTask) OnTraffic(inboundBuffer *zbuf.CombinesBuffer) {
+func (t *NetTask) OnTraffic(inboundBuffer *zbuffer.CombinesBuffer) {
 	pakSize, err := inboundBuffer.PeekInt(0, 4)
 	if err != nil {
 		return
@@ -44,7 +44,7 @@ func (t *NetTask) OnTraffic(inboundBuffer *zbuf.CombinesBuffer) {
 		return
 	}
 
-	t.c.SendUnsafeNoCopy(*inboundBuffer.PopData(int(pakSize + 4)))
+	t.c.SendUnsafeZeroCopy(inboundBuffer.PopsData(int(pakSize + 4))...)
 }
 
 func (t *NetTask) OnClose() {

@@ -123,7 +123,6 @@ func (c *CombinesBuffer) PushsNoCopy(temp *[][]byte) {
 
 var ErrDataNotEnough = errors.New("err : Data Not Enough Peek")
 
-// PeekInt 返回读取到的整型数值 最大64位  仅小端试用
 func (c *CombinesBuffer) PeekInt(begin int, byteNum int) (uint64, error) {
 	if c.LengthData() < begin+byteNum {
 		return math.MaxUint64, ErrDataNotEnough
