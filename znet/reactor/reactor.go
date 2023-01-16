@@ -39,12 +39,12 @@ func NewReactor() (r *Reactor, err error) {
 }
 
 // DoTaskInIoThread 在IO线程中执行任务
-func (r *Reactor) DoTaskInIoThread(fn epoll.TaskFunc, arg ...any) error {
-	return r.epoller.AppendTask(fn, arg)
+func (r *Reactor) DoTaskInIoThread(fn epoll.TaskFunc) error {
+	return r.epoller.AppendTask(fn)
 }
 
-func (r *Reactor) DoUrgentTaskInIoThread(fn epoll.TaskFunc, arg ...any) error {
-	return r.epoller.AppendUrgentTask(fn, arg)
+func (r *Reactor) DoUrgentTaskInIoThread(fn epoll.TaskFunc) error {
+	return r.epoller.AppendUrgentTask(fn)
 }
 
 // OnReadWriteEventTrigger Trigger On Io Thread
@@ -70,7 +70,7 @@ func (r *Reactor) AddConn(conn *Connection) error {
 	if conn.INetHandle == nil {
 		return ErrNetHandle
 	}
-	return r.DoUrgentTaskInIoThread(func(a ...any) {
+	return r.DoUrgentTaskInIoThread(func(p *epoll.Epoller) {
 		conn.reactor = r
 		r.conns[conn.fd] = conn
 		_ = r.epoller.AddReadWrite(conn.fd)

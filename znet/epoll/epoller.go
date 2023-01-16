@@ -27,63 +27,6 @@ type Epoller struct {
 	asyncTack
 }
 
-type TaskFunc func(...any)
-
-type Task struct {
-	Run TaskFunc
-	Arg []any
-}
-
-type AsyncTaskQueue interface {
-	Enqueue(*Task)
-	Dequeue() *Task
-	IsEmpty() bool
-}
-
-type TaskQueue struct {
-	q *lockfreequeue.LockFreeList
-}
-
-func NewTaskQueue() *TaskQueue {
-	return &TaskQueue{
-		q: lockfreequeue.NewLockFreeList(),
-	}
-}
-
-func (que *TaskQueue) Enqueue(task *Task) {
-	que.q.Enqueue(task)
-}
-func (que *TaskQueue) Dequeue() *Task {
-	task := que.q.Dequeue()
-	if task == nil {
-		return nil
-	}
-	return task.(*Task)
-}
-func (que *TaskQueue) IsEmpty() bool {
-	return que.q.IsEmpty()
-}
-
-var taskPool = sync.Pool{New: func() any { return new(Task) }}
-
-type asyncTack struct {
-	isWeak    int32
-	triggerFD int            //trigger handle task queue
-	normal    AsyncTaskQueue // queue with low priority
-	urgent    AsyncTaskQueue // queue with high priority
-}
-
-// getTask gets a cached Task from pool.
-func (a *asyncTack) getTask() *Task {
-	return taskPool.Get().(*Task)
-}
-
-// putTask puts the trashy Task back in pool.
-func (a *asyncTack) putTask(task *Task) {
-	task.Run, task.Arg = nil, nil
-	taskPool.Put(task)
-}
-
 func OpenEpoller() (poller *Epoller, err error) {
 	poller = &Epoller{}
 	poller.fd, err = syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
@@ -131,10 +74,10 @@ var (
 	b        = (*(*[8]byte)(unsafe.Pointer(&u)))[:]
 )
 
-func (p *Epoller) AppendUrgentTask(fn TaskFunc, arg []any) (err error) {
+func (p *Epoller) AppendUrgentTask(fn TaskFunc) (err error) {
 	var a uint64 = 1
 	task := p.getTask()
-	task.Run, task.Arg = fn, arg
+	task.Run = fn
 	p.urgent.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.isWeak, 0, 1) {
 		if _, err = syscall.Write(p.triggerFD, (*(*[8]byte)(unsafe.Pointer(&a)))[:]); err == syscall.EAGAIN {
@@ -143,9 +86,9 @@ func (p *Epoller) AppendUrgentTask(fn TaskFunc, arg []any) (err error) {
 	}
 	return os.NewSyscallError("Write", err)
 }
-func (p *Epoller) AppendTask(fn TaskFunc, arg ...any) (err error) {
+func (p *Epoller) AppendTask(fn TaskFunc) (err error) {
 	task := p.getTask()
-	task.Run, task.Arg = fn, arg
+	task.Run = fn
 	p.normal.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.isWeak, 0, 1) {
 		if _, err = syscall.Write(p.triggerFD, b); err == syscall.EAGAIN {
@@ -201,14 +144,14 @@ func (p *Epoller) Epolling(callback func(fd int, ev uint32)) (err error) {
 		if doTask {
 			doTask = false
 			for currentTask = p.urgent.Dequeue(); currentTask != nil; currentTask = p.urgent.Dequeue() {
-				currentTask.Run(currentTask.Arg...)
+				currentTask.Run(p)
 				p.putTask(currentTask)
 			}
 			for i := 0; i < MaxAsyncTasksOnceLoop; i++ {
 				if currentTask = p.normal.Dequeue(); currentTask == nil {
 					break
 				}
-				currentTask.Run(currentTask.Arg...)
+				currentTask.Run(p)
 				p.putTask(currentTask)
 			}
 			atomic.StoreInt32(&p.isWeak, 0)
@@ -255,4 +198,60 @@ func (p *Epoller) ModWrite(fd int) error {
 func (p *Epoller) ModReadWrite(fd int32) error {
 	return os.NewSyscallError("epoll_ctl mod",
 		syscall.EpollCtl(p.fd, syscall.EPOLL_CTL_MOD, int(fd), &syscall.EpollEvent{Fd: fd, Events: readWriteEvents}))
+}
+
+type TaskFunc func(p *Epoller)
+
+type Task struct {
+	Run TaskFunc
+}
+
+type AsyncTaskQueue interface {
+	Enqueue(*Task)
+	Dequeue() *Task
+	IsEmpty() bool
+}
+
+type TaskQueue struct {
+	q *lockfreequeue.LockFreeList
+}
+
+func NewTaskQueue() *TaskQueue {
+	return &TaskQueue{
+		q: lockfreequeue.NewLockFreeList(),
+	}
+}
+
+func (que *TaskQueue) Enqueue(task *Task) {
+	que.q.Enqueue(task)
+}
+func (que *TaskQueue) Dequeue() *Task {
+	task := que.q.Dequeue()
+	if task == nil {
+		return nil
+	}
+	return task.(*Task)
+}
+func (que *TaskQueue) IsEmpty() bool {
+	return que.q.IsEmpty()
+}
+
+var taskPool = sync.Pool{New: func() any { return new(Task) }}
+
+type asyncTack struct {
+	isWeak    int32
+	triggerFD int            //trigger handle task queue
+	normal    AsyncTaskQueue // queue with low priority
+	urgent    AsyncTaskQueue // queue with high priority
+}
+
+// getTask gets a cached Task from pool.
+func (a *asyncTack) getTask() *Task {
+	return taskPool.Get().(*Task)
+}
+
+// putTask puts the trashy Task back in pool.
+func (a *asyncTack) putTask(task *Task) {
+	task.Run = nil
+	taskPool.Put(task)
 }

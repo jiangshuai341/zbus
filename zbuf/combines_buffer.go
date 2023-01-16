@@ -115,16 +115,32 @@ func (c *CombinesBuffer) PushsNoCopy(temp *[][]byte) {
 var ErrDataNotEnough = errors.New("err : Data Not Enough Peek")
 
 // PeekInt 返回读取到的整型数值 最大64位  仅小端试用
-func (c *CombinesBuffer) PeekInt(byteNum int) (uint64, error) {
-	if c.LengthData() < byteNum {
+func (c *CombinesBuffer) PeekInt(begin int, byteNum int) (uint64, error) {
+	if c.LengthData() < begin+byteNum {
 		return math.MaxUint64, ErrDataNotEnough
 	}
+	var bSkipHead = begin != 0
 	if byteNum > 8 || byteNum < 0 {
 		byteNum = 8
 	}
+
 	var tempBytes []byte = make([]byte, 8)
 	var n = 0
 	for _, v := range *c.PeekData(byteNum) {
+		if len(v) == 0 {
+			continue
+		}
+
+		if bSkipHead {
+			v = v[min(begin, len(v)-1):]
+			begin -= min(begin, len(v))
+			if begin > 0 {
+				continue
+			} else {
+				bSkipHead = false
+			}
+		}
+
 		n += copy(tempBytes[n:], v)
 		if n >= byteNum {
 			break

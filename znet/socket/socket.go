@@ -25,19 +25,19 @@ type Option struct {
 	Opt        int
 }
 
-//TCPSocket 默认就是非阻塞Socket
+// TCPSocket 默认就是非阻塞Socket
 func TCPSocket(protoType ProtoType, addr string, listen bool, sockOpts ...Option) (int, net.Addr, error) {
 	return tcpSocket(protoType, addr, listen, sockOpts...)
 }
 
-//UDPSocket 默认就是非阻塞Socket
+// UDPSocket 默认就是非阻塞Socket
 func UDPSocket(protoType ProtoType, addr string, sockOpts ...Option) (int, net.Addr, error) {
 	return udpSocket(protoType, addr, sockOpts...)
 }
 
-//UDSSocket 默认就是非阻塞Socket
-func UDSSocket(addr string, passive bool, sockOpts ...Option) (int, net.Addr, error) {
-	return udsSocket(addr, passive, sockOpts...)
+// UDSSocket 默认就是非阻塞Socket
+func UDSSocket(addr string, listen bool, sockOpts ...Option) (int, net.Addr, error) {
+	return udsSocket(addr, listen, sockOpts...)
 }
 
 //SO_REUSEADDR 之后可以多路bind 但是处于listen状态不可以
@@ -62,7 +62,7 @@ func SetNoDelay(fd, _ int) error {
 	return os.NewSyscallError("Set Socket Close Nagle's algorithm", syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1))
 }
 
-//SetTcpKeepIntvl 心跳探测间隔 TCP_KEEPINTVL 覆盖 tcp_keepalive_intvl，默认75（秒）
+// SetTcpKeepIntvl 心跳探测间隔 TCP_KEEPINTVL 覆盖 tcp_keepalive_intvl，默认75（秒）
 func SetTcpKeepIntvl(fd, secs int) error {
 	if secs <= 0 {
 		return errors.New("invalid time duration")
@@ -70,7 +70,7 @@ func SetTcpKeepIntvl(fd, secs int) error {
 	return os.NewSyscallError("SetTcpKeepIntvl", syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_KEEPINTVL, secs))
 }
 
-//SetTcpKeepCnt n次无响应关闭对端 TCP_KEEPCNT 覆盖 tcp_keepalive_probes，默认9（次）
+// SetTcpKeepCnt n次无响应关闭对端 TCP_KEEPCNT 覆盖 tcp_keepalive_probes，默认9（次）
 func SetTcpKeepCnt(fd, n int) error {
 	if n <= 0 {
 		return errors.New("invalid time duration")
@@ -78,7 +78,7 @@ func SetTcpKeepCnt(fd, n int) error {
 	return os.NewSyscallError("SetTcpKeepCnt", syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_KEEPCNT, n))
 }
 
-//SetTcpKeepIdle 无数据交互secs秒之后开始心跳检测 TCP_KEEPIDLE 覆盖 tcp_keepalive_time，默认7200（秒）
+// SetTcpKeepIdle 无数据交互secs秒之后开始心跳检测 TCP_KEEPIDLE 覆盖 tcp_keepalive_time，默认7200（秒）
 func SetTcpKeepIdle(fd, secs int) error {
 	if secs <= 0 {
 		return errors.New("invalid time duration")
@@ -86,7 +86,7 @@ func SetTcpKeepIdle(fd, secs int) error {
 	return os.NewSyscallError("SetTcpKeepIdle", syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_KEEPIDLE, secs))
 }
 
-//SetTcpKeepAlive 开启TCP OS 级别心跳检测
+// SetTcpKeepAlive 开启TCP OS 级别心跳检测
 func SetTcpKeepAlive(fd, _ int) error {
 	return os.NewSyscallError("SetTcpKeepAlive", syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_KEEPALIVE, 1))
 }

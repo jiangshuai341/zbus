@@ -47,20 +47,16 @@ func newTCPConn(fd int) (*Connection, error) {
 }
 
 func (c *Connection) SendSafe(data []byte) error {
-	return c.reactor.epoller.AppendTask(func(arg ...any) {
-		for _, v := range arg {
-			c.SendUnsafe(v.([]byte))
-		}
-	}, data)
+	return c.reactor.epoller.AppendTask(func(e *epoll.Epoller) {
+		c.SendUnsafe(data)
+	})
 }
 
 // SendSafeNoCopy 线程安全
 func (c *Connection) SendSafeNoCopy(data []byte) error {
-	return c.reactor.epoller.AppendTask(func(arg ...any) {
-		for _, v := range arg {
-			c.SendUnsafeNoCopy(v.([]byte))
-		}
-	}, data)
+	return c.reactor.epoller.AppendTask(func(e *epoll.Epoller) {
+		c.SendUnsafeNoCopy(data)
+	})
 }
 
 // SendUnsafe 非线程安全

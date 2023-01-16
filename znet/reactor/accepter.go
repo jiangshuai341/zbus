@@ -3,16 +3,14 @@ package reactor
 import (
 	"github.com/jiangshuai341/zbus/znet/epoll"
 	"github.com/jiangshuai341/zbus/znet/socket"
-	"net"
 	"runtime"
 	"syscall"
 )
 
 type Accepter struct {
-	ep         *epoll.Epoller
-	cb         func(conn *Connection)
-	listenAddr net.Addr
-	lfd        int
+	ep  *epoll.Epoller
+	cb  func(conn *Connection)
+	lfd []int
 }
 
 //当Accept成为系统瓶颈时，建议使用端口复用，多线程Accept （HTTP短连接服务）
@@ -21,12 +19,11 @@ type Accepter struct {
 // ActiveListener 将传入的ListenSocket 通过IO复用同时监听 会启动一个LockOSThread的IO线程
 func ActiveListener(addr string, number int, OnAccept func(conn *Connection)) (ret []*Accepter, err error) {
 	var fd int
-	var listenAddr net.Addr
 	var ep *epoll.Epoller
 
 	for i := 0; i < number; i++ {
 
-		if fd, listenAddr, err = socket.TCPSocket(socket.TCP, addr, true, socket.Option{SetSockOpt: socket.SetReuse}); err != nil {
+		if fd, _, err = socket.TCPSocket(socket.TCP, addr, true, socket.Option{SetSockOpt: socket.SetReuse}); err != nil {
 			break
 		}
 
@@ -35,10 +32,8 @@ func ActiveListener(addr string, number int, OnAccept func(conn *Connection)) (r
 		}
 
 		accepter := &Accepter{
-			ep:         ep,
-			cb:         OnAccept,
-			listenAddr: listenAddr,
-			lfd:        fd,
+			ep: ep,
+			cb: OnAccept,
 		}
 
 		if err = accepter.AddListen(fd); err != nil {
@@ -58,11 +53,6 @@ func ActiveListener(addr string, number int, OnAccept func(conn *Connection)) (r
 	}
 
 	return ret, err
-}
-
-// AddListen 线程安全
-func (a *Accepter) AddListen(fd int) error {
-	return a.ep.AddRead(fd)
 }
 
 /*
@@ -103,13 +93,30 @@ func (a *Accepter) onAccept(lfd int, _ uint32) {
 		err != syscall.ECONNABORTED &&
 		err != syscall.EPROTO &&
 		err != syscall.EINTR {
-		log.Errorf("[Accepter] syscall.Accept Failed ListenFD:%d ListenAddr:%+v Err:%s", a.lfd, a.listenAddr, err.Error())
+		log.Errorf("[Accepter] syscall.Accept Failed ListenFD:%d  Err:%s", a.lfd, err.Error())
 		a.Close()
 	}
 	return
 }
 
+// AddListen 线程安全
+func (a *Accepter) AddListen(fd int) error {
+	return a.ep.AppendUrgentTask(func(p *epoll.Epoller) {
+		err := p.AddRead(fd)
+		if err != nil {
+			log.Errorf("Epoller AddRead Failed Socketname:%+v", fd, any(syscall.Getsockname(fd)))
+			_ = syscall.Close(fd)
+			return
+		}
+		a.lfd = append(a.lfd, fd)
+	})
+}
+
 func (a *Accepter) Close() {
-	_ = syscall.Close(a.lfd)
-	_ = a.ep.Close()
+	_ = a.ep.AppendUrgentTask(func(e *epoll.Epoller) {
+		for _, v := range a.lfd {
+			_ = syscall.Close(v)
+		}
+		_ = e.Close()
+	})
 }

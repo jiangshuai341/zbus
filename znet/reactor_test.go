@@ -1,7 +1,6 @@
 package znet
 
 import (
-	"github.com/jiangshuai341/zbus/zbuf"
 	"github.com/jiangshuai341/zbus/znet/reactor"
 	"io"
 	"net"
@@ -19,20 +18,6 @@ func TestListen(t *testing.T) {
 func TestClient(t *testing.T) {
 	runClient(1024*10*10, 1)
 	time.Sleep(1000000 * time.Second)
-}
-
-func BenchmarkSend(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-
-	}
-	b.Log()
-}
-
-func BenchmarkRecv(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-
-	}
-	b.Log()
 }
 
 func runServer(num int) {
@@ -66,51 +51,5 @@ func runClient(dataBlockSize int, clientNum int) {
 				}
 			}
 		}()
-	}
-}
-
-type NetTask struct {
-	c *reactor.Connection
-}
-
-func (t *NetTask) OnTraffic(inboundBuffer *zbuf.CombinesBuffer) {
-	pakSize, err := inboundBuffer.PeekInt(4)
-	if err != nil {
-		return
-	}
-	dataLen := inboundBuffer.LengthData()
-	if int(pakSize) > dataLen-4 {
-		return
-	}
-
-	t.c.SendUnsafeNoCopy(*inboundBuffer.PopData(int(pakSize + 4)))
-}
-
-func (t *NetTask) OnClose() {
-
-}
-
-var reactorMgr = NewReactorMgr()
-
-type ReactorMgr struct {
-	reactors []*reactor.Reactor
-}
-
-func (e *ReactorMgr) LoadBalance() *reactor.Reactor {
-	return e.reactors[0]
-}
-func NewReactorMgr() (e *ReactorMgr) {
-	e = &ReactorMgr{reactors: make([]*reactor.Reactor, 10)}
-	for i := 0; i < len(e.reactors); i++ {
-		e.reactors[i], _ = reactor.NewReactor()
-	}
-	return
-}
-
-func OnAccept(conn *reactor.Connection) {
-	conn.INetHandle = &NetTask{c: conn}
-	err := reactorMgr.LoadBalance().AddConn(conn)
-	if err != nil {
-		return
 	}
 }
