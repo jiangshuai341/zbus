@@ -1,0 +1,31 @@
+﻿syntax = "proto3";
+option go_package = "test;test";
+package test;
+
+message Vec3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+enum Color{ 
+  Red = 0;
+  Green = 1;
+  Blue = 2;
+}
+
+message Weapon {
+    string name = 1;
+    int32 damage = 2;
+}
+
+message Monster{
+  int32 mana=1;
+  int32 hp=2;
+  string name = 3;
+  bool friendly = 4;
+  bytes inventory = 5;
+  Color color = 6;
+  repeated Weapon weapons = 7;
+  repeated Vec3 path = 8;
+}

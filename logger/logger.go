@@ -38,7 +38,7 @@ const (
 // global Config
 var (
 	logLevel            = DEBUG
-	logMode     LogMode = ScrollByFileSize
+	logMode     LogMode = Console
 	colored             = false
 	maxFileNum          = 10
 	maxFileSize         = 100 //MB
