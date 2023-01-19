@@ -1,6 +1,6 @@
-.idea
-.vscode
-.vs
+.idea/
+.vscode/
+.vs/
 *.log
-build
-/tools/linux/etcd-v3.5.6/default.etcd/
+build/
+*.etcd/
