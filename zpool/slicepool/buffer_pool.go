@@ -1,4 +1,4 @@
-package zpool
+package slicepool
 
 var defaultBufferPool = slicePool[byte]{
 	defaultBitSize: minBitSize,

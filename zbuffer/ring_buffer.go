@@ -3,7 +3,7 @@ package zbuffer
 import (
 	"errors"
 	"github.com/jiangshuai341/zbus/toolkit"
-	"github.com/jiangshuai341/zbus/zpool"
+	"github.com/jiangshuai341/zbus/zpool/slicepool"
 )
 
 const (
@@ -27,7 +27,7 @@ func NewRingBuffer(size int) *RingBuffer {
 		return &RingBuffer{isEmpty: true}
 	}
 	return &RingBuffer{
-		buf:     zpool.GetBuffer2(size),
+		buf:     slicepool.GetBuffer2(size),
 		size:    size,
 		isEmpty: true,
 	}
@@ -198,10 +198,10 @@ func (rb *RingBuffer) grow(newCap int) {
 	if newCap <= DefaultBufferSize {
 		newCap = DefaultBufferSize
 	}
-	newBuf := zpool.GetBuffer2(newCap)
+	newBuf := slicepool.GetBuffer2(newCap)
 	oldLen := rb.LengthData()
 	_, _ = rb.WriteToSlice(newBuf)
-	zpool.PutBuffer(rb.buf)
+	slicepool.PutBuffer(rb.buf)
 	rb.buf = newBuf
 	rb.r = 0
 	rb.w = oldLen

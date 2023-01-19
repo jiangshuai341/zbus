@@ -3,8 +3,8 @@
 package zbuffer
 
 import (
-	"github.com/jiangshuai341/zbus/znet/linux_tcp/epoll"
-	"github.com/jiangshuai341/zbus/zpool"
+	"github.com/jiangshuai341/zbus/znet/tcp-linux/epoll"
+	"github.com/jiangshuai341/zbus/zpool/slicepool"
 	"math/bits"
 	"reflect"
 	"sync"
@@ -67,7 +67,7 @@ func (ia *IovcArray) reserve(newsize int) {
 		ia.buf = make([]epoll.Iovec, ia.prefixSize, newsize/ia.blockSize+ia.prefixSize)
 	}
 	for ia.size < newsize {
-		ia.buf = append(ia.buf, epoll.Slice2Iovec(zpool.GetBuffer2(ia.blockSize)))
+		ia.buf = append(ia.buf, epoll.Slice2Iovec(slicepool.GetBuffer2(ia.blockSize)))
 		ia.size += ia.blockSize
 	}
 }
@@ -82,7 +82,7 @@ func (ia *IovcArray) MoveTemp(num int) *[][]byte {
 		ia.buf[index].MoveToSlice((*reflect.SliceHeader)(unsafe.Pointer(&ret[i])))
 
 		ia.buf[index].Len = uint64(ia.blockSize)
-		ia.buf[index].Base = &(zpool.GetBuffer2(ia.blockSize)[0])
+		ia.buf[index].Base = &(slicepool.GetBuffer2(ia.blockSize)[0])
 
 		if num < ia.blockSize {
 			sh := (*reflect.SliceHeader)(unsafe.Pointer(&ret[i]))

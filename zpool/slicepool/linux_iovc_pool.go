@@ -1,8 +1,8 @@
 //go:build linux
 
-package zpool
+package slicepool
 
-import "github.com/jiangshuai341/zbus/znet/linux_tcp/epoll"
+import "github.com/jiangshuai341/zbus/znet/tcp-linux/epoll"
 
 var defaultIovcPool = slicePool[epoll.Iovec]{
 	defaultBitSize: minBitSize,

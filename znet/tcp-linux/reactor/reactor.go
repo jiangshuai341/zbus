@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/jiangshuai341/zbus/logger"
 	"github.com/jiangshuai341/zbus/zbuffer"
-	"github.com/jiangshuai341/zbus/znet/linux_tcp/epoll"
+	"github.com/jiangshuai341/zbus/znet/tcp-linux/epoll"
 	"syscall"
 )
 

@@ -2,7 +2,7 @@ package zbuffer
 
 import (
 	"errors"
-	"github.com/jiangshuai341/zbus/zpool"
+	"github.com/jiangshuai341/zbus/zpool/slicepool"
 	"math"
 	"unsafe"
 )
@@ -82,7 +82,7 @@ func (c *CombinesBuffer) PopData(num int) []byte {
 	if num < 0 {
 		num = c.LengthData()
 	}
-	ret := zpool.GetBuffer2(num)
+	ret := slicepool.GetBuffer2(num)
 	var n int
 	for _, v := range *c.PeekData(num) {
 		n += copy(ret[n:], v)

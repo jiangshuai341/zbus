@@ -1,4 +1,4 @@
-package zpool
+package slicepool
 
 import (
 	"math/bits"

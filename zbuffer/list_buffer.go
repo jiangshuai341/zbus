@@ -1,7 +1,7 @@
 package zbuffer
 
 import (
-	"github.com/jiangshuai341/zbus/zpool"
+	"github.com/jiangshuai341/zbus/zpool/slicepool"
 )
 
 type node struct {
@@ -32,7 +32,7 @@ func NewLinkListBuffer() *LinkListBuffer {
 
 // NewBytesFromPool 必不为空
 func (llb *LinkListBuffer) NewBytesFromPool(len int) []byte {
-	return zpool.GetBuffer2(len)
+	return slicepool.GetBuffer2(len)
 }
 
 // ListLength 链表长度
@@ -53,7 +53,7 @@ func (llb *LinkListBuffer) IsEmpty() bool {
 // Reset 删除所有元素
 func (llb *LinkListBuffer) Reset() {
 	for b := llb.pop(); b != nil; b = llb.pop() {
-		zpool.PutBuffer(b.buf)
+		slicepool.PutBuffer(b.buf)
 	}
 	llb.head = nil
 	llb.tail = nil
@@ -98,7 +98,7 @@ func (llb *LinkListBuffer) Discard(n int) (discarded int) {
 		}
 		n -= b.len()
 		discarded += b.len()
-		zpool.PutBuffer(b.buf)
+		slicepool.PutBuffer(b.buf)
 	}
 	return
 }
@@ -108,7 +108,7 @@ func (llb *LinkListBuffer) Push(p []byte) {
 	if n == 0 {
 		return
 	}
-	b := zpool.GetBuffer2(n)
+	b := slicepool.GetBuffer2(n)
 	copy(b, p)
 	llb.pushBack(&node{buf: b})
 }

@@ -2,7 +2,7 @@ package znet
 
 import (
 	"github.com/jiangshuai341/zbus/zbuffer"
-	"github.com/jiangshuai341/zbus/znet/linux_tcp/reactor"
+	"github.com/jiangshuai341/zbus/znet/tcp-linux/reactor"
 )
 
 var reactorMgr = NewReactorMgr()

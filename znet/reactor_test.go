@@ -1,7 +1,7 @@
 package znet
 
 import (
-	reactor2 "github.com/jiangshuai341/zbus/znet/linux_tcp/reactor"
+	reactor2 "github.com/jiangshuai341/zbus/znet/tcp-linux/reactor"
 	"io"
 	"net"
 	"sync"
