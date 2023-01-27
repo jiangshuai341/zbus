@@ -2,8 +2,8 @@ package reactor
 
 import "github.com/jiangshuai341/zbus/znet/socket"
 
-func Dial(addr string) *Connection {
-	fd, _, err := socket.TCPSocket(socket.TCP, addr, false)
+func Dial(url string) *Connection {
+	fd, err := socket.AutoConnect(url)
 	if err != nil {
 		log.Errorf("[Dial] Create TCPSocket Failed Err:%s", err.Error())
 		return nil

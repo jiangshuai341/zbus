@@ -143,7 +143,7 @@ func (rb *RingBuffer) ReadFromSlice(p []byte) int {
 
 // ReadFromString writes the contents of the string s to buffer, which accepts a slice of bytes.
 func (rb *RingBuffer) ReadFromString(s string) int {
-	return rb.ReadFromSlice(toolkit.StringToBytes(s))
+	return rb.ReadFromSlice(toolkit.StringToSlice(s))
 }
 
 // LengthData returns the length of available bytes to read.

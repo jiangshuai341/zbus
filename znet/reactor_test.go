@@ -1,7 +1,6 @@
 package znet
 
 import (
-	reactor2 "github.com/jiangshuai341/zbus/znet/tcp-linux/reactor"
 	"io"
 	"net"
 	"sync"
@@ -10,29 +9,24 @@ import (
 	"unsafe"
 )
 
+// TestReactorListen
 // syscall writev :  60.85
 // syscall readv :  26.12
 // syscall epoll_wait :  5.75
 // syscall total 92.72
-
-func TestListen(t *testing.T) {
-	runServer(1)
+func TestReactorListen(t *testing.T) {
+	runReactorServer(1)
 	time.Sleep(100 * time.Second)
 }
 
 func TestClient(t *testing.T) {
-
-	runClient(1024, 10)
+	runTcpClient(102400, 10, "0.0.0.0:9999")
 	time.Sleep(100 * time.Second)
 }
 
-func runServer(num int) {
-	_, _ = reactor2.ActiveListener("0.0.0.0:9999", num, OnAccept)
-}
-
-func runClient(dataBlockSize int, clientNum int) {
+func runTcpClient(dataBlockSize int, clientNum int, serverAddr string) {
 	for i := 0; i < clientNum; i++ {
-		conn, _ := net.Dial("tcp", "0.0.0.0:9999")
+		conn, _ := net.Dial("tcp", serverAddr)
 		var syncCtx sync.WaitGroup
 		syncCtx.Add(1)
 

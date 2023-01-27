@@ -1,13 +1,9 @@
 package socket
 
 import (
-	"github.com/jiangshuai341/zbus/toolkit"
-	"github.com/jiangshuai341/zbus/zpool/slicepool"
 	"net"
 	"syscall"
 )
-
-// IP层操作
 
 func setIPv6Only(fd, ipv6only int) error {
 	return syscall.SetsockoptInt(fd, syscall.IPPROTO_IPV6, syscall.IPV6_V6ONLY, ipv6only)
@@ -68,7 +64,7 @@ func ipToSockAddrInet6(ip net.IP, port int, zone string) (syscall.SockaddrInet6,
 var ipv4InIPv6Prefix = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff}
 
 func sockaddrInet4ToIP(sa *syscall.SockaddrInet4) net.IP {
-	ip := slicepool.GetBuffer2(16)
+	ip := make([]byte, 16)
 	// ipv4InIPv6Prefix
 	copy(ip[0:12], ipv4InIPv6Prefix)
 	copy(ip[12:16], sa.Addr[:])
@@ -76,7 +72,7 @@ func sockaddrInet4ToIP(sa *syscall.SockaddrInet4) net.IP {
 }
 
 func sockaddrInet6ToIPAndZone(sa *syscall.SockaddrInet6) (net.IP, string) {
-	ip := slicepool.GetBuffer2(16)
+	ip := make([]byte, 16)
 	copy(ip, sa.Addr[:])
 	return ip, ip6ZoneToString(int(sa.ZoneId))
 }
@@ -95,11 +91,11 @@ func int2decimal(i uint) string {
 	if i == 0 {
 		return "0"
 	}
-	b := slicepool.GetBuffer2(32)
+	b := make([]byte, 32)
 	bp := len(b)
 	for ; i > 0; i /= 10 {
 		bp--
 		b[bp] = byte(i%10) + '0'
 	}
-	return toolkit.BytesToString(b[bp:])
+	return string(b[bp:])
 }

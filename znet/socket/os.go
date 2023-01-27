@@ -8,11 +8,7 @@ import (
 	"syscall"
 )
 
-// os 层操作
 var listenerBacklogMaxSize = maxListenerBacklog()
-
-const SocketReadBufferSize = 87380  //8K
-const SocketWriteBufferSize = 16384 //1.6K
 
 func maxListenerBacklog() int {
 	fd, err := os.Open("/proc/sys/net/core/somaxconn")

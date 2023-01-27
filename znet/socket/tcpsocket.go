@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"github.com/jiangshuai341/zbus/errors"
+	"errors"
 	"net"
 	"os"
 	"syscall"
@@ -67,7 +67,7 @@ func getTCPSockAddr(protoType ProtoType, addr string) (sa syscall.Sockaddr, fami
 		family = syscall.AF_INET6
 		sa, err = ipToSockaddr(family, tcpAddr.IP, tcpAddr.Port, tcpAddr.Zone)
 	default:
-		err = errors.ErrUnsupportedTCPProtocol
+		err = errors.New("only tcp/tcp4/tcp6 are supported")
 	}
 	return
 }
@@ -83,5 +83,5 @@ func determineTCPProto(protoType ProtoType, addr *net.TCPAddr) (ProtoType, error
 	case TCP4, TCP6, TCP:
 		return protoType, nil
 	}
-	return "", errors.ErrUnsupportedTCPProtocol
+	return "", errors.New("only tcp/tcp4/tcp6 are supported")
 }

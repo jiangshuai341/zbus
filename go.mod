@@ -2,10 +2,7 @@ module github.com/jiangshuai341/zbus
 
 go 1.18
 
-require (
-	go.etcd.io/etcd/client/v3 v3.5.6
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
-)
+require go.etcd.io/etcd/client/v3 v3.5.6
 
 require (
 	github.com/coreos/go-semver v0.3.0 // indirect

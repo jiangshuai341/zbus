@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"github.com/jiangshuai341/zbus/errors"
+	"errors"
 	"net"
 	"os"
 	"syscall"
@@ -59,7 +59,7 @@ func getUnixSocket(addr string) (sa syscall.Sockaddr, family int, unixAddr *net.
 		sa = &syscall.SockaddrUnix{Name: unixAddr.Name}
 		family = syscall.AF_UNIX
 	default:
-		err = errors.ErrUnsupportedUDSProtocol
+		err = errors.New("only unix is supported")
 	}
 	return
 }

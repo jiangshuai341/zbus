@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"github.com/jiangshuai341/zbus/errors"
+	"errors"
 	"net"
 	"os"
 	"syscall"
@@ -73,7 +73,7 @@ func getUDPSockAddr(protoType ProtoType, addr string) (sa syscall.Sockaddr, fami
 		family = syscall.AF_INET6
 		sa, err = ipToSockaddr(family, udpAddr.IP, udpAddr.Port, udpAddr.Zone)
 	default:
-		err = errors.ErrUnsupportedUDPProtocol
+		err = errors.New("only udp/udp4/udp6 are supported")
 	}
 	return
 }
@@ -88,5 +88,5 @@ func determineUDPProto(protoType ProtoType, addr *net.UDPAddr) (ProtoType, error
 	case UDP, UDP4, UDP6:
 		return protoType, nil
 	}
-	return "", errors.ErrUnsupportedUDPProtocol
+	return "", errors.New("only udp/udp4/udp6 are supported")
 }

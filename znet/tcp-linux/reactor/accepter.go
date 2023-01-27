@@ -13,46 +13,58 @@ type Accepter struct {
 	lfd []int
 }
 
-//当Accept成为系统瓶颈时，建议使用端口复用，多线程Accept （HTTP短连接服务）
+//当Accept成为系统瓶颈时，建议使用端口复用，多线程Accept同一个端口 （HTTP短连接服务）
 //当有多个端口需要Accept,并不构成系统瓶颈时可以聚合到一个Epoller进行Accept （TCP长连接服务）
 
 // ActiveListener 将传入的ListenSocket 通过IO复用同时监听 会启动一个LockOSThread的IO线程
-func ActiveListener(addr string, number int, OnAccept func(conn *Connection)) (ret []*Accepter, err error) {
-	var fd int
+
+func NewListener(OnAccept func(conn *Connection)) (a *Accepter, err error) {
 	var ep *epoll.Epoller
-
-	for i := 0; i < number; i++ {
-
-		if fd, _, err = socket.TCPSocket(socket.TCP, addr, true, socket.Option{SetSockOpt: socket.SetReuse}); err != nil {
-			break
-		}
-
-		if ep, err = epoll.OpenEpoller(); err != nil {
-			break
-		}
-
-		accepter := &Accepter{
-			ep: ep,
-			cb: OnAccept,
-		}
-
-		if err = accepter.AddListen(fd); err != nil {
-			_ = accepter.ep.Close()
-			break
-		}
-
-		go func() {
-			runtime.LockOSThread()
-			pollingErr := accepter.ep.Epolling(accepter.onAccept)
-			if pollingErr != nil {
-				log.Error(pollingErr.Error())
-			}
-		}()
-
-		ret = append(ret, accepter)
+	if ep, err = epoll.OpenEpoller(); err != nil {
+		return
 	}
 
-	return ret, err
+	a = &Accepter{
+		ep: ep,
+		cb: OnAccept,
+	}
+
+	go func() {
+		runtime.LockOSThread()
+		pollingErr := a.ep.Epolling(a.onAccept)
+		if pollingErr != nil {
+			log.Error(pollingErr.Error())
+		}
+	}()
+	return
+}
+
+// ListenUrl
+// `tcp://192.168.0.10:9851`
+// `unix://socket`.
+//
+//	tcp   - bind to both IPv4 and IPv6
+//	tcp4  - IPv4
+//	tcp6  - IPv6
+//	udp   - bind to both IPv4 and IPv6
+//	udp4  - IPv4
+//	udp6  - IPv6
+//	unix  - Unix Domain Socket
+func (a *Accepter) ListenUrl(url string) (err error) {
+	var fd int
+	if fd, err = socket.AutoListen(url, socket.Option{SetSockOpt: socket.SetReuse}); err != nil {
+		return
+	}
+	return a.ep.AppendUrgentTask(func(p *epoll.Epoller) {
+		err := p.AddRead(fd)
+		if err != nil {
+			sa, _ := syscall.Getsockname(fd)
+			log.Errorf("Epoller AddRead Failed Socketname:%+v", fd, sa, err)
+			_ = syscall.Close(fd)
+			return
+		}
+		a.lfd = append(a.lfd, fd)
+	})
 }
 
 /*
@@ -67,7 +79,6 @@ if (conn_sock == -1)
     perror("accept");
 }
 */
-
 // onAccept 执行线程 IO Thread
 func (a *Accepter) onAccept(lfd int, _ uint32) {
 	var fd int
@@ -97,20 +108,6 @@ func (a *Accepter) onAccept(lfd int, _ uint32) {
 		a.Close()
 	}
 	return
-}
-
-// AddListen 线程安全
-func (a *Accepter) AddListen(fd int) error {
-	return a.ep.AppendUrgentTask(func(p *epoll.Epoller) {
-		err := p.AddRead(fd)
-		if err != nil {
-			sa, _ := syscall.Getsockname(fd)
-			log.Errorf("Epoller AddRead Failed Socketname:%+v", fd, sa, err)
-			_ = syscall.Close(fd)
-			return
-		}
-		a.lfd = append(a.lfd, fd)
-	})
 }
 
 func (a *Accepter) Close() {

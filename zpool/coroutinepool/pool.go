@@ -1,7 +1,8 @@
 package coroutinepool
 
-import "hash/crc32"
+type RoutinePool struct {
+}
 
-func submit(hashKey []byte, fun func()) {
-	crc32.ChecksumIEEE(hashKey)
+func New() *RoutinePool {
+	return nil
 }

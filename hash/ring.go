@@ -17,30 +17,33 @@ type HashRing[T INode] struct {
 	name                 string
 	nodes                []node[T]
 	numberOfVirtualNodes int
+	hasher               func(data []byte) uint32
 }
 
 func NewHashRing[T INode](name string, numberOfVirtualNodes int) *HashRing[T] {
+
 	return &HashRing[T]{
 		name:                 name,
 		numberOfVirtualNodes: numberOfVirtualNodes,
 		nodes:                make([]node[T], 0),
+		hasher:               crc32.ChecksumIEEE,
 	}
 }
 
 func (h *HashRing[T]) Add(n T) {
 	temp := node[T]{
 		data:    n,
-		hashKey: crc32.ChecksumIEEE(n.GetID()),
+		hashKey: h.hasher(n.GetID()),
 	}
 	for i := 0; i < h.numberOfVirtualNodes; i++ { //虚拟节点的映射
-		temp.sortKey = crc32.ChecksumIEEE(append(n.GetID(), byte(i)))
+		temp.sortKey = h.hasher(append(n.GetID(), byte(i)))
 		h.nodes = append(h.nodes, temp)
 	}
 	sort.Sort(nodeSlice[T](h.nodes))
 }
 
 func (h *HashRing[T]) Del(n T) {
-	hashKey := crc32.ChecksumIEEE(n.GetID())
+	hashKey := h.hasher(n.GetID())
 	for i, hasBeenDeleted := 0, 0; i < len(h.nodes) && hasBeenDeleted < h.numberOfVirtualNodes; {
 		if h.nodes[i].hashKey == hashKey {
 			hasBeenDeleted++
@@ -54,7 +57,7 @@ func (h *HashRing[T]) Get(key []byte) (ret T) {
 	if len(h.nodes) == 0 {
 		return
 	}
-	hashvalue := crc32.ChecksumIEEE(key)
+	hashvalue := h.hasher(key)
 	i := sort.Search(len(h.nodes), func(i int) bool { //二分法搜索找到[0, n)区间内最小的满足f(i)>=true的值i
 		return h.nodes[i].sortKey >= hashvalue // 数组 a =｛0 ，1 ，2， 5， 10 ，15｝  { a[i]>=4 return i=3 } {a[i]>=14 return 5}
 	})
