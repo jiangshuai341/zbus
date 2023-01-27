@@ -1,7 +1,7 @@
 // Example IDL file for our monster's schema.
 include "include_example.fbs";
 
-namespace Example;
+namespace lobby;
 
 enum Color:byte { Red = 0, Green, Blue = 2 }
 
@@ -20,7 +20,7 @@ table Ammunition {
 root_type Ammunition;
 
 table Monster {
-  pos:testinclude.Vec3;
+  pos:vector.Vec3;
   mana:int32 = 150;
   hp:int32 = 100;
   name:string;
@@ -28,13 +28,18 @@ table Monster {
   inventory:[ubyte];
   color:Color = Blue;
   weapons:[Weapon];
-  path:[testinclude.Vec3];
+  path:[vector.Vec3];
 }
 
-rpc_service MonsterStorage {
-  Store(Monster):testinclude.Vec3 (streaming: "none");
+rpc_service LobbyService {
+  Store(Monster):vector.Vec3 (streaming: "none");
   Retrieve(Monster):Weapon (streaming: "server");
   GetMaxHitPoint(Monster):Weapon (streaming: "client");
 }
-
+rpc_service LobbyPlayerService {
+  Store(Monster):vector.Vec3 (streaming: "rpc");
+  Retrieve(Monster):Weapon (streaming: "rpc");
+  GetMaxHitPoint(Monster):Weapon (streaming: "rpc");
+  MaxHpChange(Monster):Weapon (streaming: "delegate");
+}
 root_type Monster;

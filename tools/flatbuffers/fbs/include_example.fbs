@@ -1,4 +1,4 @@
-﻿namespace testinclude;
+﻿namespace vector;
 
 table Vec3 {
   x:float;
