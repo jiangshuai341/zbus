@@ -1,0 +1,5 @@
+{
+  "ListenPort":["1","2"],
+  "ListenUds":"/temp/gproxy.sock",
+  "ReportAddr":["127.0.0.1:8883"]
+}

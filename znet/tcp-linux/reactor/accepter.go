@@ -8,25 +8,27 @@ import (
 )
 
 type Accepter struct {
-	ep  *epoll.Epoller
-	cb  func(conn *Connection)
-	lfd []int
+	ep        *epoll.Epoller
+	iAccepter IAccepter
+	lfd       []int
+}
+
+type IAccepter interface {
+	OnAccept(conn *Connection)
 }
 
 //当Accept成为系统瓶颈时，建议使用端口复用，多线程Accept同一个端口 （HTTP短连接服务）
 //当有多个端口需要Accept,并不构成系统瓶颈时可以聚合到一个Epoller进行Accept （TCP长连接服务）
 
-// ActiveListener 将传入的ListenSocket 通过IO复用同时监听 会启动一个LockOSThread的IO线程
-
-func NewListener(OnAccept func(conn *Connection)) (a *Accepter, err error) {
+func NewListener(iAccepter IAccepter) (a *Accepter, err error) {
 	var ep *epoll.Epoller
 	if ep, err = epoll.OpenEpoller(); err != nil {
 		return
 	}
 
 	a = &Accepter{
-		ep: ep,
-		cb: OnAccept,
+		ep:        ep,
+		iAccepter: iAccepter,
 	}
 
 	go func() {
@@ -94,7 +96,7 @@ func (a *Accepter) onAccept(lfd int, _ uint32) {
 			log.Errorf("[Accepter] fd:%d RemoteAddr:%+v Err:%s", fd, sa, err2.Error())
 			continue
 		}
-		a.cb(conn)
+		a.iAccepter.OnAccept(conn)
 		if conn.INetHandle == nil {
 			panic("[Accepter] Please Check Code And Implement Connection.INetHandle")
 		}

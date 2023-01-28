@@ -2,6 +2,19 @@ package zrpc
 
 import "github.com/jiangshuai341/zbus/zpool/coroutinepool"
 
+type Cmd int32
+
+const (
+	BindDelegate Cmd = iota
+	RemoteInvoke
+
+	CreateEntity
+	DeclareDelegate
+	RegistService
+	ExecuteDelegate
+	BroadcastDelegate
+)
+
 type NetDriver interface {
 }
 
@@ -22,5 +35,5 @@ type RpcProcessor struct {
 
 func testA() {
 
-	routinePool := coroutinepool.New()
+	//routinePool := coroutinepool.New()
 }
